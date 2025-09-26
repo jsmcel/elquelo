@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { ThirdwebSDK } from '@thirdweb-dev/sdk'
-import { Base } from '@thirdweb-dev/chains'
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,26 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Already claimed' }, { status: 400 })
     }
 
-    // Initialize Thirdweb SDK
-    const sdk = ThirdwebSDK.fromPrivateKey(
-      process.env.THIRDWEB_SECRET_KEY!,
-      Base,
-      {
-        secretKey: process.env.THIRDWEB_SECRET_KEY,
-      }
-    )
-
-    // Get the contract
-    const contract = await sdk.getContract(drop.nft_contract_address)
-
-    // Mint NFT
-    const mintResult = await contract.erc1155.mint({
-      tokenId: drop.nft_token_id,
-      quantity: 1,
-      to: user.email, // This should be the wallet address
-    })
-
-    // Create claim record
+    // Create claim record (simplified - no actual NFT minting for now)
     const { data: claim, error: claimError } = await supabase
       .from('claims')
       .insert({
@@ -66,8 +45,8 @@ export async function POST(req: NextRequest) {
         drop_id: dropId,
         order_id: orderId,
         nft_token_id: drop.nft_token_id,
-        wallet_address: user.email, // This should be the actual wallet address
-        transaction_hash: mintResult.receipt.transactionHash,
+        wallet_address: user.email,
+        transaction_hash: 'pending', // Placeholder
       })
       .select()
       .single()
@@ -85,8 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       claim,
-      transactionHash: mintResult.receipt.transactionHash,
-      nftUrl: `https://opensea.io/assets/base/${drop.nft_contract_address}/${drop.nft_token_id}`,
+      message: 'NFT claim recorded (NFT functionality will be added later)',
     })
   } catch (error) {
     console.error('Error claiming NFT:', error)

@@ -3,8 +3,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { User } from '@supabase/supabase-js'
-import { ThirdwebProvider } from '@thirdweb-dev/react'
-import { Base } from '@thirdweb-dev/chains'
 
 interface UserContextType {
   user: User | null
@@ -43,13 +41,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [supabase.auth])
 
   return (
-    <ThirdwebProvider
-      activeChain={Base}
-      clientId={process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID}
-    >
-      <UserContext.Provider value={{ user, loading }}>
-        {children}
-      </UserContext.Provider>
-    </ThirdwebProvider>
+    <UserContext.Provider value={{ user, loading }}>
+      {children}
+    </UserContext.Provider>
   )
 }
