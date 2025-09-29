@@ -1,21 +1,36 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import { Toaster } from 'react-hot-toast'
+import { StripeProvider } from '@/components/StripeProvider'
 
-const inter = Inter({ subsets: ['latin'] })
+const font = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
 export const metadata: Metadata = {
-  title: 'ELQUELO - Camisetas con QR Dinámicos',
-  description: 'Camisetas inteligentes con códigos QR dinámicos, NFTs y experiencias únicas. Drops, eventos, merchandising y estados personalizados.',
-  keywords: 'camisetas, QR, NFT, dropshipping, merchandising, eventos',
-  authors: [{ name: 'ELQUELO' }],
+  title: 'ELQUELO  Kit de camisetas con QR para despedidas',
+  description:
+    'Organiza una despedida inolvidable con camisetas personalizadas, QR dinmicos y panel de control para cada integrante.',
+  keywords: 'despedidas de soltera, camisetas personalizadas, qr dinmicos, kit despedida',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/logo.png',
+  },
   openGraph: {
-    title: 'ELQUELO - Camisetas con QR Dinámicos',
-    description: 'Camisetas inteligentes con códigos QR dinámicos, NFTs y experiencias únicas.',
+    title: 'Kit ELQUELO para despedidas',
+    description:
+      'Camisetas inteligentes con QR dinmico, panel para cambiar el contenido en segundos y entrega express en Espaa.',
     type: 'website',
     locale: 'es_ES',
+    images: [
+      {
+        url: '/logo.png',
+        width: 512,
+        height: 512,
+        alt: 'ELQUELO Logo',
+      },
+    ],
   },
 }
 
@@ -26,19 +41,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={inter.className}>
+      <body className={`${font.className} bg-gray-50 text-gray-900`}>
         <Providers>
-          {children}
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
-            }}
-          />
+          <StripeProvider>
+            {children}
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#111827',
+                  color: '#F9FAFB',
+                },
+              }}
+            />
+          </StripeProvider>
         </Providers>
       </body>
     </html>

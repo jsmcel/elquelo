@@ -1,14 +1,8 @@
 interface PrintfulProduct {
   id: number
   name: string
-  type: string
-  brand: string
-  model: string
-  image: string
-  variant_count: number
-  currency: string
+  sku: string
   price: string
-  in_stock: boolean
 }
 
 interface PrintfulVariant {
@@ -17,73 +11,35 @@ interface PrintfulVariant {
   name: string
   size: string
   color: string
-  color_code: string
-  image: string
-  price: string
-  in_stock: boolean
+  sku: string
 }
 
 interface PrintfulOrder {
-  id: number
   external_id: string
-  status: string
   shipping: string
-  created: number
-  updated: number
   recipient: {
     name: string
-    company: string
+    company?: string
     address1: string
-    address2: string
+    address2?: string
     city: string
-    state_code: string
+    state_code?: string
     country_code: string
     zip: string
-    phone: string
-    email: string
+    phone?: string
+    email?: string
   }
   items: Array<{
     variant_id: number
     quantity: number
-    price: string
-    retail_price: string
-    name: string
-    product: {
-      variant_id: number
-      product_id: number
-      image: string
-      name: string
-    }
-    files: Array<{
-      id: number
-      type: string
-      hash: string
+    retail_price?: string
+    name?: string
+    files?: Array<{
       url: string
-      filename: string
-      mime_type: string
-      size: number
-      width: number
-      height: number
-      dpi: number
-      status: string
-      created: number
-      thumbnail_url: string
-      preview_url: string
-      visible: boolean
+      type: string
     }>
   }>
-  costs: {
-    currency: string
-    subtotal: string
-    discount: string
-    shipping: string
-    digitization: string
-    additional_fee: string
-    fulfillment_fee: string
-    tax: string
-    total: string
-  }
-  retail_costs: {
+  retail_costs?: {
     currency: string
     subtotal: string
     discount: string
@@ -91,164 +47,152 @@ interface PrintfulOrder {
     tax: string
     total: string
   }
-  shipments: Array<{
-    id: number
-    carrier: string
-    service: string
-    tracking_number: string
-    tracking_url: string
-    created: number
-    ship_date: string
-    shipped_at: number
-    reshipment: boolean
-    reshipment_reason: string
-  }>
-  gift: {
-    subject: string
+}
+
+interface PrintfulResponse {
+  code: number
+  result?: any
+  error?: {
+    code: number
     message: string
   }
 }
 
 class PrintfulAPI {
   private apiKey: string
-  private baseURL = 'https://api.printful.com'
+  private baseUrl = 'https://api.printful.com'
 
   constructor(apiKey: string) {
     this.apiKey = apiKey
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseURL}${endpoint}`
+  private async request(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any): Promise<PrintfulResponse> {
+    const url = `${this.baseUrl}${endpoint}`
+    
     const response = await fetch(url, {
-      ...options,
+      method,
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
-        ...options.headers,
       },
+      body: data ? JSON.stringify(data) : undefined,
     })
 
+    const result = await response.json()
+    
     if (!response.ok) {
-      throw new Error(`Printful API error: ${response.status} ${response.statusText}`)
+      throw new Error(`Printful API Error: ${result.error?.message || 'Unknown error'}`)
     }
 
-    return response.json()
+    return result
   }
 
+  // Obtener productos disponibles
   async getProducts(): Promise<PrintfulProduct[]> {
     const response = await this.request('/products')
-    return response.result
+    return response.result || []
   }
 
-  async getProduct(productId: number): Promise<PrintfulProduct> {
-    const response = await this.request(`/products/${productId}`)
-    return response.result
-  }
-
+  // Obtener variantes de un producto
   async getProductVariants(productId: number): Promise<PrintfulVariant[]> {
     const response = await this.request(`/products/${productId}/variants`)
+    return response.result || []
+  }
+
+  // Crear orden en Printful
+  async createOrder(order: PrintfulOrder): Promise<any> {
+    const response = await this.request('/orders', 'POST', order)
     return response.result
   }
 
-  async createOrder(orderData: {
-    external_id: string
-    shipping: string
-    recipient: {
-      name: string
-      company?: string
-      address1: string
-      address2?: string
-      city: string
-      state_code?: string
-      country_code: string
-      zip: string
-      phone?: string
-      email: string
-    }
-    items: Array<{
-      variant_id: number
-      quantity: number
-      retail_price?: string
-      name?: string
-      files: Array<{
-        type: string
-        url: string
-        position: {
-          area_width: number
-          area_height: number
-          width: number
-          height: number
-          top: number
-          left: number
-        }
-      }>
-    }>
-    retail_costs?: {
-      currency: string
-      subtotal: string
-      discount: string
-      shipping: string
-      tax: string
-    }
-  }): Promise<PrintfulOrder> {
-    const response = await this.request('/orders', {
-      method: 'POST',
-      body: JSON.stringify(orderData),
-    })
+  // Obtener estado de una orden
+  async getOrderStatus(externalId: string): Promise<any> {
+    const response = await this.request(`/orders/@${externalId}`)
     return response.result
   }
 
-  async getOrder(orderId: number): Promise<PrintfulOrder> {
-    const response = await this.request(`/orders/${orderId}`)
+  // Cancelar orden
+  async cancelOrder(externalId: string): Promise<any> {
+    const response = await this.request(`/orders/@${externalId}`, 'DELETE')
     return response.result
   }
 
-  async updateOrder(orderId: number, orderData: Partial<PrintfulOrder>): Promise<PrintfulOrder> {
-    const response = await this.request(`/orders/${orderId}`, {
-      method: 'PUT',
-      body: JSON.stringify(orderData),
-    })
-    return response.result
-  }
-
-  async confirmOrder(orderId: number): Promise<PrintfulOrder> {
-    const response = await this.request(`/orders/${orderId}/confirm`, {
-      method: 'POST',
-    })
-    return response.result
-  }
-
-  async cancelOrder(orderId: number, reason: string): Promise<PrintfulOrder> {
-    const response = await this.request(`/orders/${orderId}/cancel`, {
-      method: 'DELETE',
-      body: JSON.stringify({ reason }),
-    })
-    return response.result
-  }
-
-  async getShippingRates(recipient: {
-    country_code: string
-    state_code?: string
-    city?: string
-    zip: string
-  }, items: Array<{
-    variant_id: number
-    quantity: number
-  }>): Promise<Array<{
-    id: string
-    name: string
-    rate: string
-    currency: string
-    minDeliveryDays: number
-    maxDeliveryDays: number
-  }>> {
-    const response = await this.request('/shipping/rates', {
-      method: 'POST',
-      body: JSON.stringify({ recipient, items }),
+  // Obtener información de envío
+  async getShippingRates(recipient: any, items: any[]): Promise<any> {
+    const response = await this.request('/shipping/rates', 'POST', {
+      recipient,
+      items
     })
     return response.result
   }
 }
 
-export const printful = new PrintfulAPI(process.env.PRINTFUL_API_KEY!)
-export type { PrintfulProduct, PrintfulVariant, PrintfulOrder }
+// Función helper para mapear datos de nuestro sistema a Printful
+export function mapOrderToPrintful(orderData: any, designData: any): PrintfulOrder {
+  return {
+    external_id: orderData.id,
+    shipping: 'STANDARD', // O calcular basado en la dirección
+    recipient: {
+      name: orderData.shipping_address?.name || 'Cliente',
+      address1: orderData.shipping_address?.line1 || '',
+      city: orderData.shipping_address?.city || '',
+      country_code: orderData.shipping_address?.country || 'ES',
+      zip: orderData.shipping_address?.postal_code || '',
+      phone: orderData.shipping_address?.phone || '',
+      email: orderData.customer_email || '',
+    },
+    items: orderData.items.map((item: any) => ({
+      variant_id: getPrintfulVariantId(item.size, item.color, item.gender),
+      quantity: item.quantity,
+      retail_price: item.price.toString(),
+      name: `Camiseta personalizada - QR ${item.qr_code}`,
+      files: designData.imageUrl ? [{
+        url: designData.imageUrl,
+        type: 'default'
+      }] : []
+    })),
+    retail_costs: {
+      currency: 'EUR',
+      subtotal: orderData.total_amount.toString(),
+      discount: '0.00',
+      shipping: '0.00',
+      tax: '0.00',
+      total: orderData.total_amount.toString()
+    }
+  }
+}
+
+// Mapear tallas, colores y géneros a IDs de Printful
+function getPrintfulVariantId(size: string, color: string, gender: string): number {
+  // Estos IDs son ejemplos - necesitas obtener los reales de tu cuenta de Printful
+  const variantMap: Record<string, number> = {
+    // Tallas Unisex
+    'XS-unisex-white': 4011,
+    'S-unisex-white': 4012,
+    'M-unisex-white': 4013,
+    'L-unisex-white': 4014,
+    'XL-unisex-white': 4015,
+    'XXL-unisex-white': 4016,
+    
+    // Tallas Chica
+    'XS-chica-white': 4021,
+    'S-chica-white': 4022,
+    'M-chica-white': 4023,
+    'L-chica-white': 4024,
+    'XL-chica-white': 4025,
+    
+    // Tallas Chico
+    'XS-chico-white': 4031,
+    'S-chico-white': 4032,
+    'M-chico-white': 4033,
+    'L-chico-white': 4034,
+    'XL-chico-white': 4035,
+    'XXL-chico-white': 4036,
+  }
+
+  const key = `${size}-${gender}-${color}`
+  return variantMap[key] || 4013 // Default: M unisex white
+}
+
+export { PrintfulAPI }
+export type { PrintfulOrder, PrintfulProduct, PrintfulVariant }

@@ -1,99 +1,125 @@
 import Link from 'next/link'
-import { QrCode, Mail, Phone, MapPin } from 'lucide-react'
+import { Mail, Phone, MapPin, Instagram, Send } from 'lucide-react'
+
+const footerLinks = [
+  {
+    title: 'Explora',
+    links: [
+      { href: '#como-funciona', label: 'Cmo funciona' },
+      { href: '#kit', label: 'Qu incluye' },
+      { href: '#precio', label: 'Precio del kit' },
+      { href: '/configurador', label: 'Configurar ahora' },
+    ],
+  },
+  {
+    title: 'Recursos',
+    links: [
+      { href: '/dashboard', label: 'Acceder al panel' },
+      { href: '#faq', label: 'Preguntas frecuentes' },
+      { href: 'mailto:hola@elquelo.com', label: 'Soporte' },
+    ],
+  },
+]
 
 export function Footer() {
   return (
-    <footer className="bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Logo y descripción */}
-          <div className="md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">E</span>
+    <footer className="bg-gray-950 text-white">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-4">
+          <div className="md:col-span-2 space-y-5">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500 text-lg font-bold">
+                E
               </div>
-              <span className="text-2xl font-bold">ELQUELO</span>
+              <div className="leading-tight">
+                <p className="text-xl font-bold">ELQUELO</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-primary-300">
+                  QRs inteligentes para despedidas
+                </p>
+              </div>
             </div>
-            <p className="text-gray-400 mb-6 max-w-md">
-              Camisetas inteligentes con códigos QR dinámicos, NFTs únicos y experiencias que conectan. 
-              El futuro de la moda está aquí.
+            <p className="max-w-md text-sm text-gray-300">
+              El kit definitivo para organizar una despedida inolvidable: camisetas con QR dinmico, panel en tiempo real y contenido personalizado para cada integrante.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <span className="sr-only">Instagram</span>
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987s11.987-5.367 11.987-11.987C24.014 5.367 18.647.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.49-3.323-1.297C4.198 14.895 3.708 13.744 3.708 12.447s.49-2.448 1.418-3.323c.875-.807 2.026-1.297 3.323-1.297s2.448.49 3.323 1.297c.928.875 1.418 2.026 1.418 3.323s-.49 2.448-1.418 3.244c-.875.807-2.026 1.297-3.323 1.297z"/>
-                </svg>
+            <div className="flex items-center gap-3 text-sm text-gray-300">
+              <MapPin className="h-4 w-4 text-primary-400" />
+              <span>Madrid  Envos a toda Espaa</span>
+            </div>
+            <div className="flex space-x-3">
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-primary-500"
+              >
+                <Instagram className="h-4 w-4" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <span className="sr-only">Twitter</span>
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                </svg>
+              <a
+                href="mailto:hola@elquelo.com"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-primary-500"
+              >
+                <Send className="h-4 w-4" />
               </a>
             </div>
           </div>
 
-          {/* Enlaces rápidos */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Productos</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/drops" className="text-gray-400 hover:text-white transition-colors">
-                  Colecciones DROP
-                </Link>
-              </li>
-              <li>
-                <Link href="/eventos" className="text-gray-400 hover:text-white transition-colors">
-                  Eventos
-                </Link>
-              </li>
-              <li>
-                <Link href="/merchandising" className="text-gray-400 hover:text-white transition-colors">
-                  Merchandising
-                </Link>
-              </li>
-              <li>
-                <Link href="/estado" className="text-gray-400 hover:text-white transition-colors">
-                  Estado
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {footerLinks.map((column) => (
+            <div key={column.title} className="space-y-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-200">
+                {column.title}
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                {column.links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="transition hover:text-primary-400"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
 
-          {/* Contacto */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Contacto</h3>
-            <ul className="space-y-3">
-              <li className="flex items-center space-x-3">
-                <Mail className="w-5 h-5 text-primary-500" />
-                <span className="text-gray-400">hola@elquelo.com</span>
-              </li>
-              <li className="flex items-center space-x-3">
-                <Phone className="w-5 h-5 text-primary-500" />
-                <span className="text-gray-400">+34 600 000 000</span>
-              </li>
-              <li className="flex items-center space-x-3">
-                <MapPin className="w-5 h-5 text-primary-500" />
-                <span className="text-gray-400">Madrid, España</span>
-              </li>
-            </ul>
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-200">
+              Contacto directo
+            </h3>
+            <div className="space-y-3 text-sm text-gray-300">
+              <a
+                href="mailto:hola@elquelo.com"
+                className="flex items-center gap-2 transition hover:text-primary-300"
+              >
+                <Mail className="h-4 w-4 text-primary-400" />
+                hola@elquelo.com
+              </a>
+              <a
+                href="tel:+34600000000"
+                className="flex items-center gap-2 transition hover:text-primary-300"
+              >
+                <Phone className="h-4 w-4 text-primary-400" />
+                +34 600 000 000
+              </a>
+            </div>
+            <p className="text-xs text-gray-500">
+              Resolvemos dudas del pack, personalizacin de contenido y logstica de la despedida. Escrbenos o reserva una llamada!
+            </p>
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-12 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm">
-              © 2024 ELQUELO. Todos los derechos reservados.
-            </p>
-            <div className="flex space-x-6 mt-4 md:mt-0">
-              <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
+        <div className="mt-12 border-t border-white/10 pt-6 text-xs text-gray-500">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p> {new Date().getFullYear()} ELQUELO. Todos los derechos reservados.</p>
+            <div className="flex space-x-4">
+              <Link href="/privacy" className="transition hover:text-primary-300">
                 Privacidad
               </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Términos
+              <Link href="/terms" className="transition hover:text-primary-300">
+                Trminos
               </Link>
-              <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors">
+              <Link href="/cookies" className="transition hover:text-primary-300">
                 Cookies
               </Link>
             </div>

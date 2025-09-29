@@ -1,9 +1,18 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
-import { useStripe } from '@stripe/stripe-js'
 import { toast } from 'react-hot-toast'
 import { ShoppingCart, Loader } from 'lucide-react'
+import { loadStripe, Stripe } from '@stripe/stripe-js'
+
+let stripePromise: Promise<Stripe | null>
+
+const getStripe = () => {
+  if (!stripePromise && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  }
+  return stripePromise
+}
 
 interface CheckoutButtonProps {
   items: Array<{
@@ -24,9 +33,10 @@ interface CheckoutButtonProps {
 
 export function CheckoutButton({ items, productType, className = '', children }: CheckoutButtonProps) {
   const [loading, setLoading] = useState(false)
-  const stripe = useStripe()
 
   const handleCheckout = async () => {
+    const stripe = await getStripe()
+
     if (!stripe) {
       toast.error('Stripe no está disponible')
       return
@@ -70,7 +80,7 @@ export function CheckoutButton({ items, productType, className = '', children }:
   return (
     <button
       onClick={handleCheckout}
-      disabled={loading || !stripe}
+      disabled={loading || !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
       className={`flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
       {loading ? (
@@ -83,7 +93,7 @@ export function CheckoutButton({ items, productType, className = '', children }:
           {children || (
             <>
               <ShoppingCart className="w-5 h-5" />
-              <span>Comprar Ahora</span>
+              <span>Comprar ahora</span>
             </>
           )}
         </>
