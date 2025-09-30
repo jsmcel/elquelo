@@ -426,10 +426,9 @@ export function QRGenerator() {
     }
   }
 
-  const handleEditorSave = (designData: any) => {
+  const handleEditorSave = async (designData: any) => {
     if (editingQR) {
-      // Subir el diseño al servidor
-      uploadDesignToServer(editingQR.code, designData)
+      await uploadDesignToServer(editingQR.code, designData)
     }
     setEditorOpen(false)
     setEditingQR(null)
@@ -491,7 +490,10 @@ export function QRGenerator() {
           version: '1.0',
           // Agregar el QR específico para este destino
           targetQRCode: targetQR.code,
-          targetQRUrl: targetQRUrl
+          targetQRUrl: targetQRUrl,
+          printFileUrl: sourceDesign.designData.printFileUrl,
+          printFilePath: sourceDesign.designData.printFilePath,
+          printUploadedAt: sourceDesign.designData.printUploadedAt || new Date().toISOString()
         }
 
         // Guardar el diseño copiado
@@ -521,7 +523,7 @@ export function QRGenerator() {
         const targetQR = qrs.find(qr => qr.code === code)
         updatedDesigns[code] = {
           loading: false,
-          url: 'design-saved',
+          url: sourceDesign.designData.printFileUrl || 'design-saved',
           hasDesign: true,
           designData: {
             ...sourceDesign.designData,
@@ -536,7 +538,10 @@ export function QRGenerator() {
             copiedFrom: sourceDesign.code,
             copiedAt: new Date().toISOString(),
             targetQRCode: code,
-            targetQRUrl: targetQR?.destination_url
+            targetQRUrl: targetQR?.destination_url,
+            printFileUrl: sourceDesign.designData.printFileUrl,
+            printFilePath: sourceDesign.designData.printFilePath,
+            printUploadedAt: sourceDesign.designData.printUploadedAt || new Date().toISOString()
           }
         }
       })
@@ -556,6 +561,14 @@ export function QRGenerator() {
   }
 
   const uploadDesignToServer = async (code: string, designData: any) => {
+    setDesigns((prev) => ({
+      ...prev,
+      [code]: {
+        ...(prev[code] || {}),
+        loading: true
+      }
+    }))
+
     try {
       const uploadResponse = await fetch('/api/design/save', {
         method: 'POST',
@@ -576,16 +589,26 @@ export function QRGenerator() {
       setDesigns((prev) => ({
         ...prev,
         [code]: {
+          ...(prev[code] || {}),
           loading: false,
-          url: 'design-saved',
+          url: designData.printFileUrl || prev[code]?.url || 'design-saved',
           hasDesign: true,
           designData: designData
         },
       }))
-      toast.success('Diseño guardado correctamente')
     } catch (error) {
       console.error('Error uploading design:', error)
-      toast.error('No se pudo guardar el diseño')
+      setDesigns((prev) => ({
+        ...prev,
+        [code]: {
+          ...(prev[code] || {}),
+          loading: false,
+          hasDesign: prev[code]?.hasDesign || false,
+          url: prev[code]?.url,
+          designData: prev[code]?.designData
+        }
+      }))
+      throw (error instanceof Error ? error : new Error('Error al guardar el diseño'))
     }
   }
 

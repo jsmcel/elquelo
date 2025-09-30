@@ -28,11 +28,18 @@ export async function POST(request: NextRequest) {
     )
     
     // Guardar el diseño en la base de datos
+    const designDataToStore = {
+      ...designData,
+      printFileUrl: designData.printFileUrl ?? null,
+      printFilePath: designData.printFilePath ?? null,
+      printUploadedAt: designData.printUploadedAt ?? new Date().toISOString()
+    }
+
     const { data, error } = await supabase
       .from('qr_designs')
       .upsert({
         qr_code: code,
-        design_data: designData,
+        design_data: designDataToStore,
         product_size: designData.productOptions?.size || null,
         product_color: designData.productOptions?.color || null,
         product_gender: designData.productOptions?.gender || null,
