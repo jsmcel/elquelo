@@ -44,6 +44,17 @@ export async function POST(req: NextRequest) {
 
     const itemsWithDesigns = await Promise.all(designPromises)
 
+    const missingDesignAssets = itemsWithDesigns
+      .filter((item: any) => !item.design?.design_data?.printFileUrl)
+      .map((item: any) => item.qr_code)
+
+    if (missingDesignAssets.length > 0) {
+      return NextResponse.json({
+        error: 'Missing design files for one or more QR codes',
+        missingQRCodes: missingDesignAssets
+      }, { status: 400 })
+    }
+
     // Mapear a formato de Printful
     const printfulOrder = {
       external_id: order.id,
@@ -60,16 +71,17 @@ export async function POST(req: NextRequest) {
       items: itemsWithDesigns.map((item: any) => ({
         variant_id: getPrintfulVariantId(
           item.product_size || 'M',
-          item.product_color || 'white', 
+          item.product_color || 'white',
           item.product_gender || 'unisex'
         ),
         quantity: item.quantity,
         retail_price: item.price.toString(),
         name: `Camiseta personalizada - QR ${item.qr_code}`,
-        files: item.design?.design_data?.imageUrl ? [{
-          url: item.design.design_data.imageUrl,
-          type: 'default'
-        }] : []
+        files: [{
+          url: item.design!.design_data.printFileUrl,
+          type: 'default',
+          filename: `qr-${item.qr_code}.png`
+        }]
       })),
       retail_costs: {
         currency: 'EUR',

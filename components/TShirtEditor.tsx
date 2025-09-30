@@ -12,8 +12,8 @@ interface TShirtEditorProps {
   qrCode: string
   qrUrl: string
   participantName: string
-  onSave: (designData: { 
-    imageUrl: string; 
+  onSave: (designData: {
+    imageUrl: string;
     position: { x: number; y: number; scale: number; rotation: number };
     qrPosition: { x: number; y: number; scale: number; rotation: number };
     side: string;
@@ -25,7 +25,10 @@ interface TShirtEditorProps {
       color: string;
       gender: string;
     };
-  }) => void
+    printFileUrl?: string | null;
+    printFilePath?: string | null;
+    printUploadedAt?: string;
+  }) => Promise<void> | void
   savedDesignData?: any
 }
 
@@ -33,6 +36,7 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0, scale: 1, rotation: 0 })
   const [qrPosition, setQrPosition] = useState({ x: 0, y: 0, scale: 1, rotation: 0 })
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isDraggingQR, setIsDraggingQR] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -59,6 +63,7 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
     color: '',
     gender: ''
   })
+  const [isSaving, setIsSaving] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const tshirtRef = useRef<HTMLDivElement>(null)
 
@@ -106,6 +111,8 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
         setUploadedImage(savedDesignData.imageUrl)
         setImagePosition(savedDesignData.position || { x: 0, y: 0, scale: 1, rotation: 0 })
       }
+
+      setUploadedFile(null)
       
       // Cargar QRs confirmados
       if (savedDesignData.confirmedQRs) {
@@ -141,13 +148,14 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
         toast.error('Solo se permiten archivos PNG y JPEG')
         return
       }
-      
+
       const reader = new FileReader()
       reader.onload = (e) => {
         setUploadedImage(e.target?.result as string)
         setImagePosition({ x: 0, y: 0, scale: 1, rotation: 0 })
       }
       reader.readAsDataURL(file)
+      setUploadedFile(file)
     }
   }
 
@@ -193,6 +201,135 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
     }
   }
 
+  const convertFileToPng = (file: File, fallbackName: string) =>
+    new Promise<File>((resolve, reject) => {
+      if (file.type === 'image/png') {
+        const name = file.name?.toLowerCase().endsWith('.png')
+          ? file.name
+          : `${fallbackName}.png`
+        resolve(name === file.name ? file : new File([file], name, { type: 'image/png' }))
+        return
+      }
+
+      const objectUrl = URL.createObjectURL(file)
+      const image = new Image()
+      image.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          URL.revokeObjectURL(objectUrl)
+          reject(new Error('No se pudo procesar la imagen'))
+          return
+        }
+        ctx.drawImage(image, 0, 0)
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(objectUrl)
+          if (!blob) {
+            reject(new Error('No se pudo convertir la imagen a PNG'))
+            return
+          }
+          resolve(new File([blob], `${fallbackName}.png`, { type: 'image/png' }))
+        }, 'image/png')
+      }
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error('No se pudo procesar la imagen'))
+      }
+      image.src = objectUrl
+    })
+
+  const createFileFromSource = async (source: string, fallbackName: string) => {
+    const response = await fetch(source)
+    if (!response.ok) {
+      throw new Error('No se pudo obtener la imagen para subir')
+    }
+    const blob = await response.blob()
+    const type = blob.type || 'image/png'
+    const extension = type.includes('/') ? `.${type.split('/')[1]}` : '.png'
+    return new File([blob], `${fallbackName}${extension}`, { type })
+  }
+
+  const prepareFileForUpload = async () => {
+    if (uploadedFile) {
+      return convertFileToPng(uploadedFile, qrCode)
+    }
+
+    if (uploadedImage) {
+      const fileFromImage = await createFileFromSource(uploadedImage, qrCode)
+      return convertFileToPng(fileFromImage, qrCode)
+    }
+
+    return null
+  }
+
+  const handleDesignSave = async () => {
+    if (!uploadedImage && !savedDesignData?.imageUrl) {
+      toast.error('Sube una imagen primero')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const shouldUploadFile = Boolean(uploadedFile) || !savedDesignData?.printFileUrl
+      let finalPrintFileUrl = savedDesignData?.printFileUrl || null
+      let finalPrintFilePath = savedDesignData?.printFilePath || savedDesignData?.printStoragePath || null
+
+      if (shouldUploadFile) {
+        const fileForUpload = await prepareFileForUpload()
+        if (!fileForUpload) {
+          throw new Error('No se pudo preparar el archivo para subir')
+        }
+
+        const formData = new FormData()
+        formData.append('code', qrCode)
+        formData.append('file', fileForUpload)
+
+        const uploadResponse = await fetch('/api/design/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        const uploadResult = await uploadResponse.json()
+        if (!uploadResponse.ok || !uploadResult?.success || !uploadResult?.url) {
+          throw new Error(uploadResult?.error || 'No se pudo subir el PNG')
+        }
+
+        finalPrintFileUrl = uploadResult.url
+        finalPrintFilePath = uploadResult.path ?? null
+      }
+
+      const designData = {
+        imageUrl: uploadedImage || savedDesignData?.imageUrl || '',
+        position: imagePosition,
+        qrPosition: qrPosition,
+        side: currentSide,
+        printArea: {
+          name: getPrintAreaInfo(currentSide).name,
+          dimensions: getPrintAreaInfo(currentSide).dimensions,
+          maxWidth: getPrintAreaInfo(currentSide).maxWidth,
+          maxHeight: getPrintAreaInfo(currentSide).maxHeight
+        },
+        confirmedQRs: confirmedQRs,
+        confirmedImages: confirmedImages,
+        productOptions: productOptions,
+        printFileUrl: finalPrintFileUrl,
+        printFilePath: finalPrintFilePath,
+        printUploadedAt: new Date().toISOString()
+      }
+
+      await onSave(designData)
+      setUploadedFile(null)
+      toast.success('Diseño guardado con todos los elementos')
+    } catch (error) {
+      console.error('Error saving design', error)
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el diseño')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const rotateImage = () => {
     setImagePosition(prev => ({
       ...prev,
@@ -202,22 +339,6 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
 
   const resetImage = () => {
     setImagePosition({ x: 0, y: 0, scale: 1, rotation: 0 })
-  }
-
-  const handleSave = () => {
-    if (uploadedImage) {
-      onSave({
-        imageUrl: uploadedImage,
-        position: imagePosition,
-        qrPosition: qrPosition,
-        side: currentSide,
-        printArea: getPrintAreaInfo(currentSide)
-      })
-      toast.success('Diseño guardado')
-      onClose()
-    } else {
-      toast.error('Sube una imagen primero')
-    }
   }
 
   const getPrintAreaInfo = (side: string) => {
@@ -803,29 +924,11 @@ export function TShirtEditor({ isOpen, onClose, qrCode, qrUrl, participantName, 
             Cancelar
           </button>
           <button
-            onClick={() => {
-              const designData = {
-                imageUrl: uploadedImage || '',
-                position: imagePosition,
-                qrPosition: qrPosition,
-                side: currentSide,
-                printArea: { 
-                  name: getPrintAreaInfo(currentSide).name, 
-                  dimensions: getPrintAreaInfo(currentSide).dimensions,
-                  maxWidth: getPrintAreaInfo(currentSide).maxWidth,
-                  maxHeight: getPrintAreaInfo(currentSide).maxHeight
-                },
-                confirmedQRs: confirmedQRs,
-                confirmedImages: confirmedImages,
-                productOptions: productOptions
-              }
-              onSave(designData)
-              toast.success('Diseño guardado con todos los elementos')
-            }}
-            disabled={confirmedQRs.length === 0 && confirmedImages.length === 0}
+            onClick={handleDesignSave}
+            disabled={isSaving || (confirmedQRs.length === 0 && confirmedImages.length === 0)}
             className="rounded-full bg-primary-600 px-6 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Guardar Diseño
+            {isSaving ? 'Guardando...' : 'Guardar Diseño'}
           </button>
         </div>
       </div>
