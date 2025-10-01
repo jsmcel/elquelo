@@ -8,6 +8,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg'] as const
+
+function resolveExtension(mimeType: string) {
+  if (mimeType === 'image/png') return 'png'
+  if (mimeType === 'image/jpeg') return 'jpg'
+  return 'png'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabaseAuth = createRouteHandlerClient({ cookies })
@@ -27,19 +35,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (file.type !== 'image/png') {
-      return NextResponse.json({ error: 'El archivo debe ser un PNG' }, { status: 400 })
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
+      return NextResponse.json({ error: 'El archivo debe ser PNG o JPG' }, { status: 400 })
     }
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const storagePath = `${user.id}/${code}.png`
+    const safeCode = code.replace(/[^a-zA-Z0-9-_]/g, '_')
+    const extension = resolveExtension(file.type)
+    const storagePath = `${user.id}/${safeCode}.${extension}`
 
     const { error: uploadError } = await supabase.storage
       .from('designs')
       .upload(storagePath, buffer, {
-        contentType: 'image/png',
+        contentType: file.type,
         upsert: true,
       })
 
@@ -58,3 +68,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to upload design' }, { status: 500 })
   }
 }
+

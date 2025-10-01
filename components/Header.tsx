@@ -1,4 +1,6 @@
-﻿"use client"
+"use client"
+
+/* eslint-disable @next/next/no-img-element */
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -44,10 +46,10 @@ export function Header() {
       await supabase.auth.signOut()
       router.push('/')
       router.refresh()
-      toast.success('Sesión cerrada')
+      toast.success('Sesion cerrada')
     } catch (error) {
       console.error('Error during logout', error)
-      toast.error('No pudimos cerrar la sesión')
+      toast.error('No pudimos cerrar la sesion')
     } finally {
       setLoggingOut(false)
     }
@@ -73,11 +75,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center">
           <div className="flex h-24 w-24 items-center justify-center">
-            <img 
-              src="/logo.png" 
-              alt="ELQUELO Logo" 
-              className="h-20 w-20 object-contain"
-            />
+            <img src="/logo.png" alt="ELQUELO Logo" className="h-20 w-20 object-contain" />
           </div>
         </Link>
 
@@ -99,12 +97,8 @@ export function Header() {
                   disabled={loggingOut}
                   className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loggingOut ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <LogOut className="h-4 w-4" />
-                  )}
-                  Cerrar sesión
+                  {loggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                  Cerrar sesion
                 </button>
               </>
             ) : (
@@ -154,11 +148,7 @@ export function Header() {
                     disabled={loggingOut}
                     className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-left font-semibold text-red-600 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {loggingOut ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <LogOut className="h-4 w-4" />
-                    )}
+                    {loggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                     Cerrar sesion
                   </button>
                 </>

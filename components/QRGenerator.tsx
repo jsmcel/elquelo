@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element */
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useUser } from '@/app/providers'
 import { toast } from 'react-hot-toast'
@@ -17,7 +19,7 @@ import {
   Image as ImageIcon,
   Eye,
 } from 'lucide-react'
-import { TShirtEditor } from './TShirtEditor'
+import { PrintfulDesignEditor } from './PrintfulDesignEditor'
 
 interface QRRow {
   id: string
@@ -32,12 +34,158 @@ interface QRRow {
   qr_url: string
 }
 
-interface DesignState {
-  [code: string]: {
-    url?: string
-    loading: boolean
-    designData?: any
-    hasDesign?: boolean
+interface DesignStateItem {
+  url?: string
+  previewUrl?: string
+  loading: boolean
+  designData?: any
+  hasDesign?: boolean
+  mockups?: Array<{ placement: string; url: string }>
+  variantId?: number
+  source?: 'printful' | 'legacy' | 'unknown'
+  printfulSummary?: PrintfulSummary
+}
+
+type DesignState = Record<string, DesignStateItem>
+
+interface PrintfulSummary {
+  isPrintful: boolean
+  previewUrl?: string
+  mockups: Array<{ placement: string; url: string }>
+  variantId?: number
+  size?: string | null
+  color?: string | null
+  colorCode?: string | null
+  source?: string | null
+  placements?: Record<string, any>
+}
+
+function extractPrintfulSummary(designData: any): PrintfulSummary {
+  if (!designData) {
+    return {
+      isPrintful: false,
+      previewUrl: undefined,
+      mockups: [],
+      variantId: undefined,
+      size: null,
+      color: null,
+      colorCode: null,
+      source: null,
+      placements: {},
+    }
+  }
+
+  const printfulData = designData.printful || {}
+  const isPrintful = designData.editorType === 'printful' || Boolean(printfulData && Object.keys(printfulData).length)
+
+  if (!isPrintful) {
+    const preview =
+      designData.canvasData ||
+      designData.imageUrl ||
+      designData.printFileUrl ||
+      designData.printFilePath ||
+      undefined
+
+    return {
+      isPrintful: false,
+      previewUrl: preview,
+      mockups: [],
+      variantId: undefined,
+      size: null,
+      color: null,
+      colorCode: null,
+      source: null,
+      placements: designData.designsByPlacement || designData.confirmedImages || {},
+    }
+  }
+
+  let variantMockups: any =
+    designData.variantMockups ||
+    printfulData.variantMockups ||
+    printfulData.allMockups ||
+    null
+
+  let variantId =
+    designData.selectedVariantId ??
+    designData.printfulProduct?.variantId ??
+    printfulData.variantId ??
+    null
+
+  const mockups: Array<{ placement: string; url: string }> = []
+
+  if (variantMockups && typeof variantMockups === 'object') {
+    const variantKeys = Object.keys(variantMockups)
+    const targetKey =
+      variantId !== null && variantId !== undefined && (variantMockups as any)[String(variantId)]
+        ? String(variantId)
+        : variantKeys[0]
+
+    if (targetKey) {
+      const entry =
+        (variantMockups as any)[targetKey] ??
+        (variantMockups as any)[Number(targetKey)]
+
+      if (entry && typeof entry === 'object') {
+        Object.entries(entry as Record<string, any>).forEach(([placement, value]) => {
+          if (!value) return
+          if (typeof value === 'string') {
+            mockups.push({ placement, url: value })
+          } else if (typeof value === 'object' && typeof value.url === 'string') {
+            mockups.push({ placement, url: value.url })
+          }
+        })
+      } else if (typeof entry === 'string') {
+        mockups.push({ placement: 'front', url: entry })
+      }
+
+      if ((variantId === null || variantId === undefined) && targetKey) {
+        const numericKey = Number(targetKey)
+        if (!Number.isNaN(numericKey)) {
+          variantId = numericKey
+        }
+      }
+    }
+  }
+
+  const previewUrl =
+    printfulData.previewUrl ||
+    (mockups.length ? mockups[0].url : undefined) ||
+    designData.printFileUrl ||
+    designData.printFilePath ||
+    undefined
+
+  return {
+    isPrintful: true,
+    previewUrl,
+    mockups,
+    variantId: typeof variantId === 'number' && !Number.isNaN(variantId) ? variantId : undefined,
+    size: printfulData.size || designData.printfulProduct?.size || null,
+    color: printfulData.color || designData.printfulProduct?.color || null,
+    colorCode: printfulData.colorCode || designData.printfulProduct?.colorCode || null,
+    source: printfulData.source || null,
+    placements: printfulData.placements || designData.designsByPlacement || {},
+  }
+}
+
+function buildDesignStateEntry(designData: any, url?: string) {
+  const summary = extractPrintfulSummary(designData)
+  const fallbackUrl = url && url !== 'design-saved' ? url : undefined
+  const previewUrl = summary.previewUrl || fallbackUrl
+
+  let source: 'printful' | 'legacy' | 'unknown' = 'unknown'
+  if (summary.isPrintful) {
+    source = summary.source === 'printful' ? 'printful' : 'unknown'
+  } else if (fallbackUrl) {
+    source = 'legacy'
+  }
+
+  return {
+    url: previewUrl || fallbackUrl || url,
+    previewUrl,
+    mockups: summary.mockups,
+    variantId: summary.variantId,
+    source,
+    printfulSummary: summary,
   }
 }
 
@@ -163,7 +311,7 @@ export function QRGenerator() {
       return
     }
 
-    // Los formularios ya no manejan destination_url, se genera automáticamente
+    // Los formularios ya no manejan destination_url, se genera automaticamente
 
     if (!editingCode) {
       setEditForm((prev) => ({ ...prev, destination_url: defaultDestination }))
@@ -208,11 +356,17 @@ export function QRGenerator() {
             const response = await fetch(`/api/design/${qr.code}`)
             if (response.ok) {
               const data = await response.json()
-              map[qr.code] = { 
-                loading: false, 
-                url: data.url,
-                designData: data.designData, // Incluir los datos del diseño
-                hasDesign: data.hasDesign // Indicador de que tiene diseño guardado
+              const entry = buildDesignStateEntry(data.designData, data.url)
+              map[qr.code] = {
+                loading: false,
+                url: entry.url,
+                previewUrl: entry.previewUrl,
+                mockups: entry.mockups,
+                variantId: entry.variantId,
+                source: entry.source,
+                printfulSummary: entry.printfulSummary,
+                designData: data.designData,
+                hasDesign: data.hasDesign ?? Boolean(data.designData),
               }
             } else {
               map[qr.code] = { loading: false }
@@ -461,100 +615,40 @@ export function QRGenerator() {
         selectedTargetQRs.includes(qr.code) && qr.code !== sourceDesign.code
       )
 
-      // Para cada QR destino, crear un nuevo diseño basado en el origen
       const copyPromises = targetQRs.map(async (targetQR) => {
-        // Generar el QR específico para este QR destino
-        const targetQRUrl = targetQR.destination_url
-        
-        // Crear nuevo designData copiando todo y sustituyendo el QR
-        const newDesignData = {
-          ...sourceDesign.designData,
-          // Sustituir QRs con el QR correcto para este destino
-          confirmedQRs: sourceDesign.designData.confirmedQRs?.map((qr: any, index: number) => ({
-            ...qr,
-            id: `qr-${targetQR.code}-${index}`, // ID único para este QR
-            // Mantener la misma posición y configuración
-            position: qr.position,
-            side: qr.side
-          })) || [],
-          confirmedImages: sourceDesign.designData.confirmedImages || [],
-          // Mantener posiciones y configuraciones
-          imageUrl: sourceDesign.designData.imageUrl,
-          position: sourceDesign.designData.position,
-          qrPosition: sourceDesign.designData.qrPosition,
-          side: sourceDesign.designData.side,
-          printArea: sourceDesign.designData.printArea,
-          // Agregar metadatos de copia
-          copiedFrom: sourceDesign.code,
-          copiedAt: new Date().toISOString(),
-          version: '1.0',
-          // Agregar el QR específico para este destino
-          targetQRCode: targetQR.code,
-          targetQRUrl: targetQRUrl,
-          printFileUrl: sourceDesign.designData.printFileUrl,
-          printFilePath: sourceDesign.designData.printFilePath,
-          printUploadedAt: sourceDesign.designData.printUploadedAt || new Date().toISOString()
+        const clonedDesign = JSON.parse(JSON.stringify(sourceDesign.designData || {}))
+        clonedDesign.qrCode = targetQR.code
+        clonedDesign.copiedFrom = sourceDesign.code
+        clonedDesign.copiedAt = new Date().toISOString()
+        clonedDesign.targetQRCode = targetQR.code
+        clonedDesign.targetQRUrl = targetQR.destination_url
+        if (clonedDesign.printful) {
+          clonedDesign.printful = {
+            ...clonedDesign.printful,
+            qrCode: targetQR.code,
+          }
+        }
+        if (clonedDesign.printfulProduct) {
+          clonedDesign.printfulProduct = {
+            ...clonedDesign.printfulProduct,
+            qrCode: targetQR.code,
+          }
         }
 
-        // Guardar el diseño copiado
-        const response = await fetch('/api/design/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            code: targetQR.code,
-            designData: newDesignData
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Error copiando diseño a ${targetQR.code}`)
-        }
-
+        await uploadDesignToServer(targetQR.code, clonedDesign)
         return targetQR.code
       })
 
       const copiedCodes = await Promise.all(copyPromises)
-      
-      // Actualizar el estado local
-      const updatedDesigns = { ...designs }
-      copiedCodes.forEach(code => {
-        const targetQR = qrs.find(qr => qr.code === code)
-        updatedDesigns[code] = {
-          loading: false,
-          url: sourceDesign.designData.printFileUrl || 'design-saved',
-          hasDesign: true,
-          designData: {
-            ...sourceDesign.designData,
-            // Incluir QRs sustituidos con el QR correcto
-            confirmedQRs: sourceDesign.designData.confirmedQRs?.map((qr: any, index: number) => ({
-              ...qr,
-              id: `qr-${code}-${index}`,
-              position: qr.position,
-              side: qr.side
-            })) || [],
-            confirmedImages: sourceDesign.designData.confirmedImages || [],
-            copiedFrom: sourceDesign.code,
-            copiedAt: new Date().toISOString(),
-            targetQRCode: code,
-            targetQRUrl: targetQR?.destination_url,
-            printFileUrl: sourceDesign.designData.printFileUrl,
-            printFilePath: sourceDesign.designData.printFilePath,
-            printUploadedAt: sourceDesign.designData.printUploadedAt || new Date().toISOString()
-          }
-        }
-      })
-      setDesigns(updatedDesigns)
 
-      toast.success(`Diseño copiado a ${copiedCodes.length} QR(s)`)
+      toast.success(`Diseno copiado a ${copiedCodes.length} QR(s)`)
       setCopyDesignOpen(false)
       setSourceDesign(null)
       setSelectedTargetQRs([])
 
     } catch (error) {
       console.error('Error copying design:', error)
-      toast.error('Error al copiar el diseño')
+      toast.error('Error al copiar el diseno')
     } finally {
       setCopyingDesign(false)
     }
@@ -583,19 +677,22 @@ export function QRGenerator() {
 
       const data = await uploadResponse.json()
       if (!uploadResponse.ok || !data.success) {
-        throw new Error(data.error || 'Error al guardar el diseño')
+        throw new Error(data.error || 'Error al guardar el diseno')
       }
 
-      setDesigns((prev) => ({
-        ...prev,
-        [code]: {
-          ...(prev[code] || {}),
-          loading: false,
-          url: designData.printFileUrl || prev[code]?.url || 'design-saved',
-          hasDesign: true,
-          designData: designData
-        },
-      }))
+      setDesigns((prev) => {
+        const entry = buildDesignStateEntry(designData, designData.printFileUrl || prev[code]?.previewUrl || prev[code]?.url)
+        return {
+          ...prev,
+          [code]: {
+            ...(prev[code] || {}),
+            ...entry,
+            loading: false,
+            hasDesign: true,
+            designData,
+          },
+        }
+      })
     } catch (error) {
       console.error('Error uploading design:', error)
       setDesigns((prev) => ({
@@ -603,14 +700,24 @@ export function QRGenerator() {
         [code]: {
           ...(prev[code] || {}),
           loading: false,
-          hasDesign: prev[code]?.hasDesign || false,
-          url: prev[code]?.url,
-          designData: prev[code]?.designData
-        }
+        },
       }))
-      throw (error instanceof Error ? error : new Error('Error al guardar el diseño'))
+      throw (error instanceof Error ? error : new Error('Error al guardar el diseno'))
     }
   }
+
+  const viewingSummary = viewingDesign?.designData ? extractPrintfulSummary(viewingDesign.designData) : null
+  const viewingPreviewUrl =
+    viewingSummary?.previewUrl ||
+    viewingDesign?.designData?.canvasData ||
+    viewingDesign?.designData?.imageUrl ||
+    viewingDesign?.designData?.printFileUrl ||
+    viewingDesign?.designData?.printFilePath
+  const viewingMockups = viewingSummary?.mockups ?? []
+  const viewingPlacements =
+    viewingSummary?.placements && typeof viewingSummary.placements === 'object'
+      ? Object.entries(viewingSummary.placements as Record<string, any>)
+      : []
 
   if (!user) {
     return (
@@ -775,6 +882,9 @@ export function QRGenerator() {
         <div className="space-y-5">
           {qrs.map((qr) => {
             const designState = designs[qr.code]
+            const previewUrl =
+              designState?.previewUrl ||
+              (designState?.url && designState.url !== 'design-saved' ? designState.url : undefined)
             const qrImage = qrImages[qr.code]
             const isEditing = editingCode === qr.code
             const isUpdating = updatingCode === qr.code
@@ -944,8 +1054,8 @@ export function QRGenerator() {
                             <ImageIcon className="h-6 w-6 text-primary-500" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">Diseño PNG</p>
-                            <p className="text-xs text-gray-500">Sube la creatividad que se imprimirá en la camiseta.</p>
+                            <p className="text-sm font-semibold text-gray-900">Mockups Printful</p>
+                            <p className="text-xs text-gray-500">Gestiona las creatividades y genera mockups oficiales.</p>
                           </div>
                         </div>
                         <button
@@ -953,7 +1063,7 @@ export function QRGenerator() {
                           className="inline-flex items-center gap-2 rounded-full border border-gray-200/60 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600"
                         >
                           <UploadCloud className="h-4 w-4" />
-                          {designState?.loading ? 'Subiendo...' : 'Subir nuevo PNG'}
+                          {designState?.loading ? 'Preparando editor...' : 'Editar con Printful'}
                         </button>
                       </div>
                       <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200/40 bg-white">
@@ -963,45 +1073,92 @@ export function QRGenerator() {
                             <span className="ml-2">Procesando PNG...</span>
                           </div>
                         ) : designState?.hasDesign ? (
-                          <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                            <div className="text-center">
-                              <div className="mb-2 text-green-600">✓ Diseño guardado</div>
-                              <div className="text-xs text-gray-400 mb-3">
-                                {designState.designData?.confirmedQRs?.length || 0} QRs fijados, {designState.designData?.confirmedImages?.length || 0} diseños fijados
+                          <div className="flex flex-col gap-4 p-4 text-sm text-gray-600">
+                            {designState?.printfulSummary?.isPrintful ? (
+                              <div className="flex flex-col gap-3">
+                                <div className="flex items-center gap-3">
+                                  {previewUrl ? (
+                                    <img
+                                      src={previewUrl}
+                                      alt={`Mockup ${qr.code}`}
+                                      className="h-20 w-20 rounded-xl border border-gray-200 object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-gray-100 text-gray-400">
+                                      <ImageIcon className="h-6 w-6" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="font-semibold text-gray-900">Diseno Printful guardado</p>
+                                    <p className="text-xs text-gray-500">
+                                      Variante {designState.printfulSummary?.variantId ?? 'N/A'} -{' '}
+                                      {designState.printfulSummary?.size ?? 'Sin talla'} -{' '}
+                                      {designState.printfulSummary?.color ?? 'Sin color'}
+                                    </p>
+                                  </div>
+                                </div>
+                                {designState.mockups && designState.mockups.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {designState.mockups.slice(0, 4).map((mockup) => (
+                                      <img
+                                        key={`${mockup.placement}-${mockup.url}`}
+                                        src={mockup.url}
+                                        alt={`Mockup ${mockup.placement}`}
+                                        className="h-16 w-16 rounded-lg border border-gray-100 object-cover"
+                                      />
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleViewDesign(qr.code)}
-                                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                                >
-                                  <Eye className="w-3 h-3 mr-1" />
-                                  Ver diseño
-                                </button>
-                                <button
-                                  onClick={() => handleCopyDesign(qr.code)}
-                                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
-                                >
-                                  <Copy className="w-3 h-3 mr-1" />
-                                  Copiar diseño
-                                </button>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-center">
+                                <div className="font-semibold text-green-600">Diseno guardado</div>
+                                {previewUrl && (
+                                  <img
+                                    src={previewUrl}
+                                    alt={`Diseno ${qr.code}`}
+                                    className="h-24 w-24 rounded-xl border border-gray-100 object-cover"
+                                  />
+                                )}
+                                <p className="text-xs text-gray-500">Diseno legacy guardado para este QR.</p>
                               </div>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleViewDesign(qr.code)}
+                                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> Ver diseno
+                              </button>
+                              <button
+                                onClick={() => handleCopyDesign(qr.code)}
+                                className="inline-flex items-center gap-2 rounded-full border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700 transition hover:border-green-300 hover:text-green-800"
+                              >
+                                <Copy className="h-3.5 w-3.5" /> Copiar diseno
+                              </button>
+                              <button
+                                onClick={() => uploadDesign(qr.code)}
+                                className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-primary-200 hover:text-primary-600"
+                              >
+                                <UploadCloud className="h-3.5 w-3.5" /> Editar con Printful
+                              </button>
                             </div>
                           </div>
-                        ) : designState?.url && designState.url !== 'design-saved' ? (
+                        ) : previewUrl ? (
                           <div className="relative">
-                            <img src={designState.url} alt={`Diseo ${qr.title ?? qr.code}`} className="w-full rounded-2xl" />
+                            <img src={previewUrl} alt={`Diseno ${qr.title ?? qr.code}`} className="w-full rounded-2xl object-contain bg-gray-50" />
                             <a
-                              href={designState.url}
+                              href={previewUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-primary-600 shadow"
                             >
-                              <Eye className="h-3.5 w-3.5" /> Ver PNG
+                              <Eye className="h-3.5 w-3.5" /> Ver archivo
                             </a>
                           </div>
                         ) : (
                           <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                            No hay diseño todavía. Sube un PNG para esta camiseta.
+                            No hay diseno todavia. Genera un mockup con Printful.
                           </div>
                         )}
                       </div>
@@ -1014,29 +1171,26 @@ export function QRGenerator() {
         </div>
       )}
       
-      {/* Editor de Camisetas */}
+      {/* Editor Printful */}
       {editorOpen && editingQR && (
-        <TShirtEditor
-          isOpen={editorOpen}
+        <PrintfulDesignEditor
+          qrCode={editingQR.code}
           onClose={() => {
             setEditorOpen(false)
             setEditingQR(null)
           }}
-          qrCode={editingQR.code}
-          qrUrl={editingQR.qr_url}
-          participantName={editingQR.title || 'Usuario'}
           onSave={handleEditorSave}
           savedDesignData={designs[editingQR.code]?.designData}
         />
       )}
 
-      {/* Modal para ver diseño */}
+      {/* Modal para ver diseno */}
       {viewDesignOpen && viewingDesign && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
-                Diseño guardado - {viewingDesign.code}
+                Mockups Printful - {viewingDesign.code}
               </h3>
               <button
                 onClick={() => {
@@ -1049,72 +1203,108 @@ export function QRGenerator() {
               </button>
             </div>
             <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
-              <div className="space-y-4">
-                {/* Información del diseño */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-2">QRs confirmados</h4>
-                    <div className="text-sm text-gray-600">
-                      {viewingDesign.designData?.confirmedQRs?.length || 0} QRs fijados
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <h4 className="text-sm font-semibold text-gray-900">Variante Printful</h4>
+                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                      <p>ID variante: {viewingSummary?.variantId ?? 'N/D'}</p>
+                      <p>Talla: {viewingSummary?.size ?? 'Sin talla'}</p>
+                      <p>Color: {viewingSummary?.color ?? 'Sin color'}</p>
                     </div>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-2">Diseños confirmados</h4>
-                    <div className="text-sm text-gray-600">
-                      {viewingDesign.designData?.confirmedImages?.length || 0} diseños fijados
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <h4 className="text-sm font-semibold text-gray-900">Detalles del guardado</h4>
+                    <div className="mt-2 space-y-1 text-sm text-gray-600">
+                      <p>Producto: {viewingDesign.designData?.printfulProduct?.name || 'Printful'}</p>
+                      <p>Guardado: {new Date(viewingDesign.designData?.savedAt || viewingDesign.designData?.createdAt || Date.now()).toLocaleString()}</p>
+                      <p>QR destino: {viewingDesign.code}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Vista previa del diseño */}
-                {viewingDesign.designData?.canvasData && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-3">Vista previa del diseño</h4>
+                {viewingMockups.length > 0 ? (
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Mockups generados</h4>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {viewingMockups.map((mockup) => (
+                        <div key={`${mockup.placement}-${mockup.url}`} className="space-y-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                          <img
+                            src={mockup.url}
+                            alt={`Mockup ${mockup.placement}`}
+                            className="w-full rounded-lg object-cover"
+                          />
+                          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{mockup.placement}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : viewingPreviewUrl ? (
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Vista previa</h4>
                     <div className="flex justify-center">
-                      <div className="bg-white p-4 rounded-lg shadow-sm border">
-                        <img 
-                          src={viewingDesign.designData.canvasData} 
-                          alt="Diseño guardado" 
-                          className="max-w-full max-h-96 object-contain"
-                        />
-                      </div>
+                      <img
+                        src={viewingPreviewUrl}
+                        alt={`Diseno ${viewingDesign.code}`}
+                        className="max-h-96 rounded-xl border border-gray-200 bg-white object-contain"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
+                    No encontramos mockups para este diseno. Genera nuevos mockups desde el editor de Printful.
+                  </div>
+                )}
+
+                {viewingPlacements.length > 0 && (
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Archivos por posicion</h4>
+                    <div className="space-y-2 text-sm text-gray-600">
+                      {viewingPlacements.map(([placement, value]) => {
+                        const imageUrl = typeof value === 'string' ? value : value?.imageUrl
+                        if (!imageUrl) {
+                          return null
+                        }
+                        return (
+                          <div key={placement} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
+                            <span className="font-medium text-gray-800">{placement}</span>
+                            <a
+                              href={imageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" /> Abrir
+                            </a>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Detalles técnicos */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-3">Detalles del diseño</h4>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>Fecha de creación: {new Date(viewingDesign.designData?.createdAt || Date.now()).toLocaleString()}</div>
-                    <div>Versión: {viewingDesign.designData?.version || '1.0'}</div>
-                    <div>Resolución: {viewingDesign.designData?.resolution || 'No especificada'}</div>
-                  </div>
-                </div>
-
-                {/* Botones de acción */}
-                <div className="flex justify-end space-x-3 pt-4 border-t">
+                <div className="flex justify-end gap-3 border-t pt-4">
                   <button
                     onClick={() => {
                       setViewDesignOpen(false)
                       setViewingDesign(null)
                     }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300"
                   >
                     Cerrar
                   </button>
-                  {viewingDesign.designData?.canvasData && (
+                  {viewingPreviewUrl && (
                     <button
                       onClick={() => {
                         const link = document.createElement('a')
-                        link.href = viewingDesign.designData.canvasData
-                        link.download = `diseño-${viewingDesign.code}.png`
+                        link.href = viewingPreviewUrl
+                        link.target = '_blank'
+                        link.rel = 'noopener noreferrer'
                         link.click()
                       }}
-                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
                     >
-                      <Download className="w-4 h-4 inline mr-2" />
-                      Descargar
+                      <Download className="h-4 w-4" /> Abrir archivo
                     </button>
                   )}
                 </div>
@@ -1123,14 +1313,13 @@ export function QRGenerator() {
           </div>
         </div>
       )}
-
-      {/* Modal para copiar diseño */}
+      {/* Modal para copiar diseno */}
       {copyDesignOpen && sourceDesign && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
-                Copiar diseño - {sourceDesign.code}
+                Copiar diseno - {sourceDesign.code}
               </h3>
               <button
                 onClick={() => {
@@ -1145,17 +1334,17 @@ export function QRGenerator() {
             </div>
             <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
               <div className="space-y-4">
-                {/* Información del diseño origen */}
+                {/* Informacion del diseno origen */}
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Diseño origen</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">Diseno origen</h4>
                   <div className="text-sm text-blue-700">
                     <div>QR: {sourceDesign.code}</div>
-                    <div>Imágenes: {sourceDesign.designData?.confirmedImages?.length || 0}</div>
+                    <div>Imagenes: {sourceDesign.designData?.confirmedImages?.length || 0}</div>
                     <div>Lado: {sourceDesign.designData?.side || 'No especificado'}</div>
                   </div>
                 </div>
 
-                {/* Selección de QRs destino */}
+                {/* Seleccion de QRs destino */}
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">Seleccionar QRs destino</h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -1177,14 +1366,14 @@ export function QRGenerator() {
                           />
                           <div className="ml-3 flex-1">
                             <div className="text-sm font-medium text-gray-900">
-                              {qr.title || 'Sin título'} ({qr.code})
+                              {qr.title || 'Sin titulo'} ({qr.code})
                             </div>
                             <div className="text-xs text-gray-500">
                               {qr.destination_url}
                             </div>
                             {designs[qr.code]?.hasDesign && (
                               <div className="text-xs text-orange-600 mt-1">
-                                ⚠️ Ya tiene diseño - se sobrescribirá
+                                WARNING Ya tiene diseno - se sobrescribira
                               </div>
                             )}
                           </div>
@@ -1193,18 +1382,18 @@ export function QRGenerator() {
                   </div>
                 </div>
 
-                {/* Información sobre la copia */}
+                {/* Informacion sobre la copia */}
                 <div className="bg-green-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-green-900 mb-2">✅ Copia automática</h4>
+                  <h4 className="font-medium text-green-900 mb-2">OK Copia automatica</h4>
                   <div className="text-sm text-green-700 space-y-1">
-                    <div>• Se copiarán las imágenes y posiciones del diseño</div>
-                    <div>• Los QRs se sustituirán automáticamente por el QR correcto de cada destino</div>
-                    <div>• Si un QR ya tiene diseño, se sobrescribirá</div>
-                    <div>• Cada QR mantendrá su URL única pero con el mismo diseño</div>
+                    <div>- Se copiaran las imagenes y posiciones del diseno</div>
+                    <div>- Los QRs se sustituiran automaticamente por el QR correcto de cada destino</div>
+                    <div>- Si un QR ya tiene diseno, se sobrescribira</div>
+                    <div>- Cada QR mantendra su URL unica pero con el mismo diseno</div>
                   </div>
                 </div>
 
-                {/* Botones de acción */}
+                {/* Botones de accion */}
                 <div className="flex justify-end space-x-3 pt-4 border-t">
                   <button
                     onClick={() => {
@@ -1242,3 +1431,4 @@ export function QRGenerator() {
     </div>
   )
 }
+
