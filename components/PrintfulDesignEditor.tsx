@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -79,6 +79,9 @@ type VariantMockups = Record<number, Record<string, { url: string; raw?: any }>>
 type VariantMockupsFromApi = Record<string, Record<string, string>>
 
 const DEFAULT_PRODUCT_ID = 71
+
+type DesignMetadata = Record<string, { width: number; height: number }>
+
 const POLL_INTERVAL_MS = 2000
 const MAX_POLL_ATTEMPTS = 20
 
@@ -188,6 +191,44 @@ function normalizePlacements(raw: ProductPlacement[] | undefined | null): Produc
   })
 }
 
+function normalizeDesignMetadata(source: any): DesignMetadata {
+  if (!source || typeof source !== 'object') {
+    return {}
+  }
+  return Object.entries(source as Record<string, any>).reduce((acc, [placement, value]) => {
+    const width = ensureNumber((value as any)?.width, 0)
+    const height = ensureNumber((value as any)?.height, 0)
+    if (width > 0 && height > 0) {
+      acc[placement] = { width, height }
+    }
+    return acc
+  }, {} as DesignMetadata)
+}
+
+function loadImageDimensions(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new Error('No se puede calcular el tamaño de la imagen en el servidor'))
+      return
+    }
+    const image = new window.Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => {
+      const width = image.naturalWidth || image.width
+      const height = image.naturalHeight || image.height
+      if (!width || !height) {
+        reject(new Error('No pudimos leer las dimensiones de la imagen'))
+        return
+      }
+      resolve({ width, height })
+    }
+    image.onerror = () => {
+      reject(new Error('No pudimos cargar la imagen para calcular las dimensiones'))
+    }
+    image.src = url
+  })
+}
+
 function normalizeVariantMockups(source: VariantMockupsFromApi | undefined | null): VariantMockups {
   const normalized: VariantMockups = {}
   if (!source) {
@@ -235,6 +276,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   const [loadingProduct, setLoadingProduct] = useState(true)
   const [productData, setProductData] = useState<ProductData | null>(null)
   const [designsByPlacement, setDesignsByPlacement] = useState<DesignsByPlacement>({})
+  const [designMetadata, setDesignMetadata] = useState<DesignMetadata>({})
   const [variantMockups, setVariantMockups] = useState<VariantMockups>({})
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null)
   const [selectedSize, setSelectedSize] = useState('')
@@ -382,6 +424,14 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
     let isMounted = true
 
+    const fallbackTimer = setTimeout(() => {
+      if (!isMounted) {
+        return
+      }
+      setLoadingCatalog(false)
+      setCatalogProducts((prev) => (prev.length ? prev : [fallbackCatalogProduct]))
+    }, 8000)
+
     const fetchCatalog = async () => {
       catalogFetchedRef.current = true
       setLoadingCatalog(true)
@@ -432,6 +482,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         if (isMounted) {
           setLoadingCatalog(false)
         }
+        clearTimeout(fallbackTimer)
       }
     }
 
@@ -439,6 +490,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
     return () => {
       isMounted = false
+      clearTimeout(fallbackTimer)
     }
   }, [fallbackCatalogProduct])
 
@@ -574,7 +626,16 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         ? savedPrintful.lastMessage
         : productData.message || null
 
+    const savedMetadata = matchesSavedProduct
+      ? normalizeDesignMetadata(
+          savedPrintful?.designMetadata ||
+            savedDesignData?.designMetadata ||
+            savedDesignData?.designMetadataByPlacement,
+        )
+      : {}
+
     setDesignsByPlacement(nextDesigns)
+    setDesignMetadata(savedMetadata)
     setVariantMockups(nextVariantMockups)
     setSelectedVariantId(nextVariantId)
     setSelectedSize(nextSize)
@@ -582,8 +643,20 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     setActivePlacement(nextActivePlacement)
     setStatusMessage(nextStatus)
 
+    if (typeof window !== 'undefined') {
+      Object.entries(nextDesigns).forEach(([placementKey, url]) => {
+        if (!url) {
+          return
+        }
+        if (savedMetadata[placementKey]) {
+          return
+        }
+        ensureDesignMetadata(placementKey, url)
+      })
+    }
+
     lastInitializedProductIdRef.current = productData.productId
-  }, [placementList, productData, savedDesignData])
+  }, [ensureDesignMetadata, placementList, productData, savedDesignData])
 
   const availableSizes = useMemo(() => productData?.sizes || [], [productData])
 
@@ -636,6 +709,12 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
   const handleRemoveDesign = (placement: string) => {
     setDesignsByPlacement((prev) => ({ ...prev, [placement]: '' }))
+    setDesignMetadata((prev) => {
+      if (!prev[placement]) return prev
+      const next = { ...prev }
+      delete next[placement]
+      return next
+    })
     if (selectedVariantId) {
       setVariantMockups((prev) => {
         if (!prev[selectedVariantId]) return prev
@@ -659,6 +738,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     setGeneratingMockup(false)
 
     setDesignsByPlacement({})
+    setDesignMetadata({})
     setVariantMockups({})
     setSelectedVariantId(null)
     setSelectedSize('')
@@ -677,6 +757,30 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   const handleCatalogSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCatalogSearchTerm(event.target.value)
   }
+
+  const ensureDesignMetadata = useCallback((placementKey: string, imageUrl: string) => {
+    if (!imageUrl || typeof window === 'undefined') {
+      return
+    }
+    loadImageDimensions(imageUrl)
+      .then(({ width, height }) => {
+        setDesignMetadata((prev) => {
+          const current = prev[placementKey]
+          if (current && current.width === width && current.height === height) {
+            return prev
+          }
+          return { ...prev, [placementKey]: { width, height } }
+        })
+      })
+      .catch((error) => {
+        console.warn(`[printful] no pudimos calcular las dimensiones para ${placementKey}`, error)
+        setDesignMetadata((prev) => {
+          const next = { ...prev }
+          delete next[placementKey]
+          return next
+        })
+      })
+  }, [])
 
   const handleCatalogProductChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = event.target
@@ -736,6 +840,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       }
 
       setDesignsByPlacement((prev) => ({ ...prev, [activePlacement]: data.url }))
+      ensureDesignMetadata(activePlacement, data.url)
       if (selectedVariantId) {
         setVariantMockups((prev) => {
           if (!prev[selectedVariantId]) return prev
@@ -760,18 +865,43 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         const imageUrl = designsByPlacement[placement.placement]
         if (!imageUrl) return null
 
-        const top = ensureNumber(placement.position?.top, 0)
-        const left = ensureNumber(placement.position?.left, 0)
-        const width = ensureNumber(placement.position?.width, ensureNumber(placement.areaWidth, 3600))
-        const height = ensureNumber(placement.position?.height, ensureNumber(placement.areaHeight, 4800))
-        const areaWidth = ensureNumber(placement.areaWidth, width)
-        const areaHeight = ensureNumber(placement.areaHeight, height)
+        const baseTop = ensureNumber(placement.position?.top, 0)
+        const baseLeft = ensureNumber(placement.position?.left, 0)
+        const baseWidth = ensureNumber(placement.position?.width, ensureNumber(placement.width, 3600))
+        const baseHeight = ensureNumber(placement.position?.height, ensureNumber(placement.height, 4800))
+        const areaWidth = Math.max(1, ensureNumber(placement.areaWidth, baseWidth))
+        const areaHeight = Math.max(1, ensureNumber(placement.areaHeight, baseHeight))
+        const boundsWidth = Math.max(1, baseWidth)
+        const boundsHeight = Math.max(1, baseHeight)
+
+        const metadata = designMetadata[placement.placement]
+        const originalWidth = metadata?.width ? Math.max(1, Math.round(metadata.width)) : boundsWidth
+        const originalHeight = metadata?.height ? Math.max(1, Math.round(metadata.height)) : boundsHeight
+
+        let targetWidth = originalWidth
+        let targetHeight = originalHeight
+
+        if (originalWidth > boundsWidth || originalHeight > boundsHeight) {
+          const scale = Math.min(boundsWidth / originalWidth, boundsHeight / originalHeight)
+          targetWidth = Math.max(1, Math.round(originalWidth * scale))
+          targetHeight = Math.max(1, Math.round(originalHeight * scale))
+        }
+
+        const offsetLeft = baseLeft + Math.max(0, Math.floor((boundsWidth - targetWidth) / 2))
+        const offsetTop = baseTop + Math.max(0, Math.floor((boundsHeight - targetHeight) / 2))
 
         return {
           placement: placement.placement,
           imageUrl,
           printfileId: placement.printfileId ?? undefined,
-          position: { top, left, width, height, areaWidth, areaHeight },
+          position: {
+            top: offsetTop,
+            left: offsetLeft,
+            width: targetWidth,
+            height: targetHeight,
+            areaWidth,
+            areaHeight,
+          },
         }
       })
       .filter((entry): entry is {
@@ -916,6 +1046,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       qrCode,
       savedAt: new Date().toISOString(),
       designsByPlacement,
+      designMetadata,
       variantMockups,
       selectedVariantId,
       productId: productData.productId,
@@ -939,6 +1070,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         placements: Object.fromEntries(
           Object.entries(designsByPlacement).map(([placement, url]) => [placement, { imageUrl: url || null }])
         ),
+        designMetadata,
         variantMockups,
         activePlacement,
         lastMessage: statusMessage,
