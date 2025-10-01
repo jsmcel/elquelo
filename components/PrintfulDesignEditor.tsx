@@ -208,7 +208,7 @@ function normalizeDesignMetadata(source: any): DesignMetadata {
 function loadImageDimensions(url: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
-      reject(new Error('No se puede calcular el tamaño de la imagen en el servidor'))
+      reject(new Error('No se puede calcular el tamano de la imagen en el servidor'))
       return
     }
     const image = new window.Image()
