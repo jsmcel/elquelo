@@ -326,6 +326,30 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     image: productData?.image || null,
   }), [productData, selectedProductId])
 
+  const ensureDesignMetadata = useCallback((placementKey: string, imageUrl: string) => {
+    if (!imageUrl || typeof window === 'undefined') {
+      return
+    }
+    loadImageDimensions(imageUrl)
+      .then(({ width, height }) => {
+        setDesignMetadata((prev) => {
+          const current = prev[placementKey]
+          if (current && current.width === width && current.height === height) {
+            return prev
+          }
+          return { ...prev, [placementKey]: { width, height } }
+        })
+      })
+      .catch((error) => {
+        console.warn(`[printful] no pudimos calcular las dimensiones para ${placementKey}`, error)
+        setDesignMetadata((prev) => {
+          const next = { ...prev }
+          delete next[placementKey]
+          return next
+        })
+      })
+  }, [])
+
   const selectedVariant = useMemo(() => {
     if (!productData || !selectedVariantId) return null
     return productData.variants.find((variant) => variant.id === selectedVariantId) || null
@@ -757,30 +781,6 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   const handleCatalogSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCatalogSearchTerm(event.target.value)
   }
-
-  const ensureDesignMetadata = useCallback((placementKey: string, imageUrl: string) => {
-    if (!imageUrl || typeof window === 'undefined') {
-      return
-    }
-    loadImageDimensions(imageUrl)
-      .then(({ width, height }) => {
-        setDesignMetadata((prev) => {
-          const current = prev[placementKey]
-          if (current && current.width === width && current.height === height) {
-            return prev
-          }
-          return { ...prev, [placementKey]: { width, height } }
-        })
-      })
-      .catch((error) => {
-        console.warn(`[printful] no pudimos calcular las dimensiones para ${placementKey}`, error)
-        setDesignMetadata((prev) => {
-          const next = { ...prev }
-          delete next[placementKey]
-          return next
-        })
-      })
-  }, [])
 
   const handleCatalogProductChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = event.target
