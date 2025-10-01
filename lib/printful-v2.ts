@@ -35,6 +35,34 @@ export class PrintfulClient {
     return headers
   }
 
+  private buildQuery(params?: Record<string, unknown>): string {
+    if (!params) {
+      return ''
+    }
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null) {
+        return
+      }
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item !== undefined && item !== null) {
+            searchParams.append(key, String(item))
+          }
+        })
+        return
+      }
+      searchParams.append(key, String(value))
+    })
+    const query = searchParams.toString()
+    return query ? `?${query}` : ''
+  }
+
+  getCatalogProducts(params?: Record<string, unknown>) {
+    const query = this.buildQuery(params)
+    return this.request(`/products${query}`)
+  }
+
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), init.signal ? 0 : 15000)
