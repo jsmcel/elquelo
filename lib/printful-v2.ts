@@ -1,4 +1,4 @@
-onst PRINTFUL_BASE_URL = process.env.PRINTFUL_API_BASE || 'https://api.printful.com'
+const PRINTFUL_BASE_URL = process.env.PRINTFUL_API_BASE || 'https://api.printful.com'
 
 export interface PrintfulClientOptions {
   apiKey?: string
@@ -80,4 +80,3 @@ export class PrintfulClient {
     return this.request(`/mockup-generator/printfiles/${productId}`)
   }
 }
-
