@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
       .from('designs')
       .getPublicUrl(storagePath)
 
-    return NextResponse.json({ success: true, path: storagePath, url: publicUrlData.publicUrl })
+    const cacheBuster = Date.now().toString(36)
+    const publicUrl = `${publicUrlData.publicUrl}?v=${cacheBuster}`
+
+    return NextResponse.json({ success: true, path: storagePath, url: publicUrl })
   } catch (error) {
     console.error('Design upload error:', error)
     return NextResponse.json({ error: 'Failed to upload design' }, { status: 500 })
