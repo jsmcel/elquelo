@@ -452,20 +452,15 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
     let isMounted = true
 
-    const fallbackTimer = setTimeout(() => {
-      if (!isMounted) {
-        return
-      }
-      setLoadingCatalog(false)
-      setCatalogProducts((prev) => (prev.length ? prev : [fallbackCatalogProduct]))
-    }, 8000)
-
     const fetchCatalog = async () => {
       catalogFetchedRef.current = true
       setLoadingCatalog(true)
       setCatalogError(null)
       try {
-        const response = await fetch('/api/printful/products?limit=100')
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 12000)
+        const response = await fetch('/api/printful/products?limit=200', { signal: controller.signal })
+        clearTimeout(timeout)
         const data = await response.json()
         if (!response.ok || !Array.isArray(data.products)) {
           throw new Error(data.error || 'No pudimos obtener el catalogo de Printful')
@@ -504,13 +499,12 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         if (!isMounted) {
           return
         }
-        setCatalogProducts([fallbackCatalogProduct])
+        setCatalogProducts((prev) => (prev.length ? prev : [fallbackCatalogProduct]))
         setCatalogError(error instanceof Error ? error.message : 'No pudimos obtener el catalogo de Printful')
       } finally {
         if (isMounted) {
           setLoadingCatalog(false)
         }
-        clearTimeout(fallbackTimer)
       }
     }
 
@@ -518,7 +512,6 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
     return () => {
       isMounted = false
-      clearTimeout(fallbackTimer)
     }
   }, [fallbackCatalogProduct])
 
