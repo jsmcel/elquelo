@@ -18,6 +18,20 @@ async function loadCachedCatalog() {
   }
 }
 
+async function saveCatalogCache(products: any[], source: string) {
+  try {
+    const payload = {
+      fetchedAt: new Date().toISOString(),
+      source,
+      products,
+    }
+    await fs.mkdir(path.dirname(CATALOG_CACHE_PATH), { recursive: true })
+    await fs.writeFile(CATALOG_CACHE_PATH, JSON.stringify(payload, null, 2), 'utf8')
+  } catch (error) {
+    console.warn('[printful catalog] no pudimos guardar cache', error)
+  }
+}
+
 const LEGACY_CATALOG_FALLBACK = [
   {
     id: 71,
@@ -100,7 +114,9 @@ export async function GET(request: NextRequest) {
       .map(normalizeProduct)
       .filter((product): product is NonNullable<ReturnType<typeof normalizeProduct>> => Boolean(product))
 
-    if (!products.length) {
+    if (products.length) {
+      await saveCatalogCache(products, 'printful')
+    } else {
       const cached = await loadCachedCatalog()
       if (cached.length) {
         products = cached
@@ -109,9 +125,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const responseSource = products === LEGACY_CATALOG_FALLBACK ? 'fallback' : 'printful'
+
     return NextResponse.json({
       success: true,
-      source: 'printful',
+      source: responseSource,
       products,
       paging: payload?.paging || null,
     })
