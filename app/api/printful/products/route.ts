@@ -5,23 +5,50 @@ import path from 'path'
 
 const CATALOG_CACHE_PATH = path.resolve(process.cwd(), 'mocks', 'printful-catalog.json')
 
-async function loadCachedCatalog() {
+interface CachedCatalogProduct {
+  id: number
+  name: string
+  type: string | null
+  brand: string | null
+  model: string | null
+  image: string | null
+  variantsCount: number | null
+}
+
+interface CachedCatalog {
+  products: CachedCatalogProduct[]
+  fetchedAt: string | null
+  source: string | null
+}
+
+async function loadCachedCatalog(): Promise<CachedCatalog> {
   try {
     const file = await fs.readFile(CATALOG_CACHE_PATH, 'utf8')
     const data = JSON.parse(file)
     if (Array.isArray(data?.products)) {
-      return data.products
+      const products = data.products
+        .map((product: any) => normalizeProduct(product))
+        .filter(Boolean) as CachedCatalogProduct[]
+      return {
+        products,
+        fetchedAt: typeof data?.fetchedAt === 'string' ? data.fetchedAt : null,
+        source: typeof data?.source === 'string' ? data.source : null,
+      }
     }
-    return []
   } catch (error) {
-    return []
+    // ignore load errors
   }
+  return { products: [], fetchedAt: null, source: null }
 }
 
-async function saveCatalogCache(products: any[], source: string) {
+async function saveCatalogCache(
+  products: CachedCatalogProduct[],
+  source: string,
+  fetchedAt: string = new Date().toISOString(),
+) {
   try {
     const payload = {
-      fetchedAt: new Date().toISOString(),
+      fetchedAt,
       source,
       products,
     }
@@ -112,36 +139,44 @@ export async function GET(request: NextRequest) {
 
     let products = rawProducts
       .map(normalizeProduct)
-      .filter((product): product is NonNullable<ReturnType<typeof normalizeProduct>> => Boolean(product))
+      .filter((product): product is CachedCatalogProduct => Boolean(product))
+
+    let responseSource: 'printful' | 'cache' | 'fallback' = 'printful'
+    let cachedAt: string | null = null
 
     if (products.length) {
-      await saveCatalogCache(products, 'printful')
+      const fetchedAt = new Date().toISOString()
+      await saveCatalogCache(products, 'printful', fetchedAt)
+      cachedAt = fetchedAt
     } else {
       const cached = await loadCachedCatalog()
-      if (cached.length) {
-        products = cached
+      if (cached.products.length) {
+        products = cached.products
+        responseSource = 'cache'
+        cachedAt = cached.fetchedAt
       } else {
         products = [...LEGACY_CATALOG_FALLBACK]
+        responseSource = 'fallback'
       }
     }
-
-    const responseSource = products === LEGACY_CATALOG_FALLBACK ? 'fallback' : 'printful'
 
     return NextResponse.json({
       success: true,
       source: responseSource,
       products,
       paging: payload?.paging || null,
+      cachedAt,
     })
   } catch (error) {
     console.error('Error fetching Printful catalog products', error)
     const cached = await loadCachedCatalog()
-    if (cached.length) {
+    if (cached.products.length) {
       return NextResponse.json({
         success: true,
         source: 'cache',
-        products: cached,
+        products: cached.products,
         paging: null,
+        cachedAt: cached.fetchedAt,
         error: error instanceof Error ? error.message : 'No pudimos cargar el catalogo real de Printful',
       })
     }
@@ -151,6 +186,7 @@ export async function GET(request: NextRequest) {
         source: 'fallback',
         products: [...LEGACY_CATALOG_FALLBACK],
         paging: null,
+        cachedAt: null,
         error: error instanceof Error ? error.message : 'No pudimos cargar el catalogo real de Printful',
       },
       { status: 200 },

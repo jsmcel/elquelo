@@ -270,6 +270,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   })
   const [manualProductCode, setManualProductCode] = useState(() => String(selectedProductId))
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([])
+  const [catalogFetchedAt, setCatalogFetchedAt] = useState<string | null>(null)
   const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('')
@@ -1144,7 +1145,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                 </select>
                 {showNoCatalogResultsHint && (
                   <p className="text-xs text-gray-500">
-                    No encontramos productos con ese filtro. Mostramos el catalogo completo.
+                    No encontramos productos para &ldquo;{catalogSearchTerm}&rdquo;. Mostramos los {catalogProducts.length} disponibles.
                   </p>
                 )}
                 {catalogError && (
