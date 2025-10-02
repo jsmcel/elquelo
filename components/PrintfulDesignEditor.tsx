@@ -452,6 +452,9 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
     let isMounted = true
 
+    setCatalogProducts((prev) => (prev.length ? prev : [fallbackCatalogProduct]))
+    setLoadingCatalog(false)
+
     const fetchCatalog = async () => {
       catalogFetchedRef.current = true
       setLoadingCatalog(true)
@@ -493,7 +496,13 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
             }
           })
           .filter((product): product is CatalogProduct => Boolean(product))
-        setCatalogProducts(normalized.length ? normalized : [fallbackCatalogProduct])
+        if (!normalized.length) {
+          setCatalogProducts([fallbackCatalogProduct])
+          setCatalogError(data.error || 'No pudimos obtener productos desde Printful. Usamos el fallback.')
+        } else {
+          setCatalogProducts(normalized)
+          setCatalogError(null)
+        }
       } catch (error) {
         console.error('Error fetching Printful catalog', error)
         if (!isMounted) {
