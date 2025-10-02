@@ -602,6 +602,9 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     }
 
     let nextVariantMockups: VariantMockups = {}
+    if (savedDesignData?.variantMockups) {
+      nextVariantMockups = normalizeVariantMockups(savedDesignData.variantMockups as VariantMockupsFromApi)
+    }
     if (matchesSavedProduct) {
       const savedVariantMockups =
         savedPrintful?.allMockups || savedPrintful?.variantMockups || savedDesignData?.variantMockups
@@ -614,8 +617,11 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     const savedVariantCandidate = Number(
       savedPrintful?.variantId ?? savedDesignData?.printfulProduct?.variantId ?? Number.NaN,
     )
-    if (matchesSavedProduct && Number.isFinite(savedVariantCandidate)) {
-      nextVariantId = savedVariantCandidate
+    if (Number.isFinite(savedVariantCandidate)) {
+      const candidate = Number(savedVariantCandidate)
+      if (productData.variants.some((variant) => variant.id === candidate)) {
+        nextVariantId = candidate
+      }
     }
 
     if (!nextVariantId) {
