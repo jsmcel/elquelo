@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrintfulClient } from '@/lib/printful-v2'
+import { promises as fs } from 'fs'
+import path from 'path'
+
+const CATALOG_CACHE_PATH = path.resolve(process.cwd(), 'mocks', 'printful-catalog.json')
+
+async function loadCachedCatalog() {
+  try {
+    const file = await fs.readFile(CATALOG_CACHE_PATH, 'utf8')
+    const data = JSON.parse(file)
+    if (Array.isArray(data?.products)) {
+      return data.products
+    }
+    return []
+  } catch (error) {
+    return []
+  }
+}
 
 const LEGACY_CATALOG_FALLBACK = [
   {
@@ -84,7 +101,12 @@ export async function GET(request: NextRequest) {
       .filter((product): product is NonNullable<ReturnType<typeof normalizeProduct>> => Boolean(product))
 
     if (!products.length) {
-      products = [...LEGACY_CATALOG_FALLBACK]
+      const cached = await loadCachedCatalog()
+      if (cached.length) {
+        products = cached
+      } else {
+        products = [...LEGACY_CATALOG_FALLBACK]
+      }
     }
 
     return NextResponse.json({
@@ -95,6 +117,16 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching Printful catalog products', error)
+    const cached = await loadCachedCatalog()
+    if (cached.length) {
+      return NextResponse.json({
+        success: true,
+        source: 'cache',
+        products: cached,
+        paging: null,
+        error: error instanceof Error ? error.message : 'No pudimos cargar el catalogo real de Printful',
+      })
+    }
     return NextResponse.json(
       {
         success: true,

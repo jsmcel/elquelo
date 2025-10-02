@@ -315,6 +315,8 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
   const trimmedCatalogSearch = catalogSearchTerm.trim()
   const showNoCatalogResultsHint = Boolean(trimmedCatalogSearch) && filteredCatalogProducts.length === 0
+  const showCatalogLoading = loadingCatalog && catalogProducts.length === 0
+
   const catalogOptions = showNoCatalogResultsHint ? catalogProducts : filteredCatalogProducts
 
   const fallbackCatalogProduct = useMemo(() => ({
@@ -1116,38 +1118,37 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
             <div className="rounded-2xl border border-gray-200 bg-white p-4">
               <label className="block text-xs font-semibold text-gray-500">Producto Printful</label>
               <div className="mt-2 space-y-2">
-                {loadingCatalog ? (
+                {showCatalogLoading && (
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-                    <span>Cargando catalogo...</span>
+                    <span>Conectando con el catalogo real de Printful...</span>
                   </div>
-                ) : (
-                  <>
-                    <input
-                      value={catalogSearchTerm}
-                      onChange={handleCatalogSearchChange}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      placeholder="Buscar por nombre, marca o ID"
-                    />
-                    <select
-                      value={selectedProductId ? String(selectedProductId) : ''}
-                      onChange={handleCatalogProductChange}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    >
-                      <option value="">Selecciona un producto</option>
-                      {catalogOptions.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {formatCatalogOptionLabel(product)}
-                        </option>
-                      ))}
-                    </select>
-                    {showNoCatalogResultsHint && (
-                      <p className="text-xs text-gray-500">
-                        No encontramos productos con ese filtro. Mostramos el catalogo completo.
-                      </p>
-                    )}
-                    {catalogError && <p className="text-xs text-red-500">{catalogError}</p>}
-                  </>
+                )}
+                <input
+                  value={catalogSearchTerm}
+                  onChange={handleCatalogSearchChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Buscar por nombre, marca o ID"
+                />
+                <select
+                  value={selectedProductId ? String(selectedProductId) : ''}
+                  onChange={handleCatalogProductChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Selecciona un producto</option>
+                  {catalogOptions.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {formatCatalogOptionLabel(product)}
+                    </option>
+                  ))}
+                </select>
+                {showNoCatalogResultsHint && (
+                  <p className="text-xs text-gray-500">
+                    No encontramos productos con ese filtro. Mostramos el catalogo completo.
+                  </p>
+                )}
+                {catalogError && (
+                  <p className="text-xs text-orange-600">{catalogError}</p>
                 )}
               </div>
               <form onSubmit={handleManualProductSubmit} className="mt-2 flex gap-2">
