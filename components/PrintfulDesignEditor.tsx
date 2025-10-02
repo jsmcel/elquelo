@@ -326,19 +326,23 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     image: productData?.image || null,
   }), [productData, selectedProductId])
 
+  const updateDesignMetadata = useCallback((placementKey: string, width: number, height: number) => {
+    setDesignMetadata((prev) => {
+      const current = prev[placementKey]
+      if (current && current.width === width && current.height === height) {
+        return prev
+      }
+      return { ...prev, [placementKey]: { width, height } }
+    })
+  }, [])
+
   const ensureDesignMetadata = useCallback((placementKey: string, imageUrl: string) => {
     if (!imageUrl || typeof window === 'undefined') {
       return
     }
     loadImageDimensions(imageUrl)
       .then(({ width, height }) => {
-        setDesignMetadata((prev) => {
-          const current = prev[placementKey]
-          if (current && current.width === width && current.height === height) {
-            return prev
-          }
-          return { ...prev, [placementKey]: { width, height } }
-        })
+        updateDesignMetadata(placementKey, width, height)
       })
       .catch((error) => {
         console.warn(`[printful] no pudimos calcular las dimensiones para ${placementKey}`, error)
@@ -348,7 +352,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
           return next
         })
       })
-  }, [])
+  }, [updateDesignMetadata])
 
   const selectedVariant = useMemo(() => {
     if (!productData || !selectedVariantId) return null
@@ -839,8 +843,19 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         throw new Error(data.error || 'No pudimos subir la imagen')
       }
 
+      let dimensions: { width: number; height: number } | null = null
+      try {
+        dimensions = await loadImageDimensions(data.url)
+        updateDesignMetadata(activePlacement, dimensions.width, dimensions.height)
+      } catch (dimensionError) {
+        console.warn('[printful] no pudimos medir las dimensiones antes de guardar', dimensionError)
+        ensureDesignMetadata(activePlacement, data.url)
+      }
+
       setDesignsByPlacement((prev) => ({ ...prev, [activePlacement]: data.url }))
-      ensureDesignMetadata(activePlacement, data.url)
+      if (!dimensions) {
+        ensureDesignMetadata(activePlacement, data.url)
+      }
       if (selectedVariantId) {
         setVariantMockups((prev) => {
           if (!prev[selectedVariantId]) return prev
@@ -865,30 +880,26 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         const imageUrl = designsByPlacement[placement.placement]
         if (!imageUrl) return null
 
+        const areaWidth = Math.max(1, ensureNumber(placement.areaWidth, ensureNumber(placement.width, 3600)))
+        const areaHeight = Math.max(1, ensureNumber(placement.areaHeight, ensureNumber(placement.height, 4800)))
         const baseTop = ensureNumber(placement.position?.top, 0)
         const baseLeft = ensureNumber(placement.position?.left, 0)
-        const baseWidth = ensureNumber(placement.position?.width, ensureNumber(placement.width, 3600))
-        const baseHeight = ensureNumber(placement.position?.height, ensureNumber(placement.height, 4800))
-        const areaWidth = Math.max(1, ensureNumber(placement.areaWidth, baseWidth))
-        const areaHeight = Math.max(1, ensureNumber(placement.areaHeight, baseHeight))
-        const boundsWidth = Math.max(1, baseWidth)
-        const boundsHeight = Math.max(1, baseHeight)
 
         const metadata = designMetadata[placement.placement]
-        const originalWidth = metadata?.width ? Math.max(1, Math.round(metadata.width)) : boundsWidth
-        const originalHeight = metadata?.height ? Math.max(1, Math.round(metadata.height)) : boundsHeight
+        const originalWidth = metadata?.width ? Math.max(1, Math.round(metadata.width)) : areaWidth
+        const originalHeight = metadata?.height ? Math.max(1, Math.round(metadata.height)) : areaHeight
 
         let targetWidth = originalWidth
         let targetHeight = originalHeight
 
-        if (originalWidth > boundsWidth || originalHeight > boundsHeight) {
-          const scale = Math.min(boundsWidth / originalWidth, boundsHeight / originalHeight)
+        if (originalWidth > areaWidth || originalHeight > areaHeight) {
+          const scale = Math.min(areaWidth / originalWidth, areaHeight / originalHeight)
           targetWidth = Math.max(1, Math.round(originalWidth * scale))
           targetHeight = Math.max(1, Math.round(originalHeight * scale))
         }
 
-        const offsetLeft = baseLeft + Math.max(0, Math.floor((boundsWidth - targetWidth) / 2))
-        const offsetTop = baseTop + Math.max(0, Math.floor((boundsHeight - targetHeight) / 2))
+        const offsetLeft = baseLeft + Math.max(0, Math.floor((areaWidth - targetWidth) / 2))
+        const offsetTop = baseTop + Math.max(0, Math.floor((areaHeight - targetHeight) / 2))
 
         return {
           placement: placement.placement,
