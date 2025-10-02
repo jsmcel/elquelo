@@ -889,14 +889,9 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         const originalWidth = metadata?.width ? Math.max(1, Math.round(metadata.width)) : areaWidth
         const originalHeight = metadata?.height ? Math.max(1, Math.round(metadata.height)) : areaHeight
 
-        let targetWidth = originalWidth
-        let targetHeight = originalHeight
-
-        if (originalWidth > areaWidth || originalHeight > areaHeight) {
-          const scale = Math.min(areaWidth / originalWidth, areaHeight / originalHeight)
-          targetWidth = Math.max(1, Math.round(originalWidth * scale))
-          targetHeight = Math.max(1, Math.round(originalHeight * scale))
-        }
+        const scale = Math.min(areaWidth / originalWidth, areaHeight / originalHeight) || 1
+        const targetWidth = Math.max(1, Math.round(originalWidth * scale))
+        const targetHeight = Math.max(1, Math.round(originalHeight * scale))
 
         const offsetLeft = baseLeft + Math.max(0, Math.floor((areaWidth - targetWidth) / 2))
         const offsetTop = baseTop + Math.max(0, Math.floor((areaHeight - targetHeight) / 2))
