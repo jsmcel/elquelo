@@ -19,16 +19,19 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: designData, error: designError } = await supabase
+    const { data: designRows, error: designError } = await supabase
       .from('qr_designs')
-      .select('design_data, product_size, product_color, product_gender')
+      .select('design_data, product_size, product_color, product_gender, created_at')
       .eq('qr_code', params.code)
-      .maybeSingle()
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .limit(1)
 
-    if (designError && designError.code && designError.code !== 'PGRST116') {
+    if (designError) {
       console.error('[design:get] error loading design row', designError)
       return NextResponse.json({ success: false, error: 'Failed to load design' }, { status: 500 })
     }
+
+    const designData = designRows?.[0]
 
     if (designData?.design_data) {
       return NextResponse.json({

@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
       printUploadedAt: designData.printUploadedAt ?? new Date().toISOString()
     }
 
+    const timestamp = new Date().toISOString()
+
     const { data, error } = await supabase
       .from('qr_designs')
       .upsert({
@@ -43,8 +45,8 @@ export async function POST(request: NextRequest) {
         product_size: designData.productOptions?.size || null,
         product_color: designData.productOptions?.color || null,
         product_gender: designData.productOptions?.gender || null,
-        created_at: new Date().toISOString()
-      })
+        created_at: timestamp,
+      }, { onConflict: 'qr_code' })
       .select()
 
     if (error) {
