@@ -156,7 +156,7 @@ export function OrderStatus() {
 
             {order.printful_order_id && (
               <div className="mt-2 text-xs text-gray-500">
-                ID Printful: {order.printful_order_id}
+                ID Orden: {order.printful_order_id}
               </div>
             )}
           </div>

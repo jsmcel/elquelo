@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { printful } from '@/lib/printful'
+import { PrintfulAPI } from '@/lib/printful'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -9,6 +9,12 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.PRINTFUL_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Printful API key no configurada' }, { status: 500 })
+    }
+    const printfulClient = new PrintfulAPI(apiKey)
+
     const { orderId, items, shippingAddress } = await req.json()
 
     // Get order from database
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
     }))
 
     // Create Printful order
-    const printfulOrder = await printful.createOrder({
+    const printfulOrder = await printfulClient.createOrder({
       external_id: order.id,
       shipping: 'STANDARD',
       recipient: {
@@ -73,6 +79,7 @@ export async function POST(req: NextRequest) {
         discount: '0',
         shipping: '0',
         tax: '0',
+        total: order.total_amount.toString(),
       },
     })
 

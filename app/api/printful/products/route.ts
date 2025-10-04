@@ -1,195 +1,480 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { PrintfulClient } from '@/lib/printful-v2'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 
-const CATALOG_CACHE_PATH = path.resolve(process.cwd(), 'mocks', 'printful-catalog.json')
+const CATALOG_PATH = path.resolve(process.cwd(), 'mocks', 'printful-catalog-full.json')
+const CACHE_TTL_MS = 15 * 60 * 1000
+const IN_STOCK_STATUSES = new Set(['in_stock', 'stocked_on_demand'])
 
-interface CachedCatalogProduct {
+interface RawCatalogFile {
+  items?: any[]
+  products?: any[]
+  fetchedAt?: string
+}
+
+interface AvailabilityEntry {
+  region: string
+  status: string
+}
+
+interface CatalogPlacement {
+  id: string
+  label: string
+  additionalPrice: number | null
+}
+
+interface CatalogVariant {
+  id: number
+  size: string | null
+  color: string | null
+  colorCode: string | null
+  price: number | null
+  image: string | null
+  inStock: boolean
+  availability: AvailabilityEntry[]
+  availableRegions: string[]
+}
+
+interface CatalogProduct {
   id: number
   name: string
   type: string | null
   brand: string | null
-  model: string | null
   image: string | null
-  variantsCount: number | null
-}
-
-interface CachedCatalog {
-  products: CachedCatalogProduct[]
+  placements: CatalogPlacement[]
+  variants: CatalogVariant[]
   fetchedAt: string | null
-  source: string | null
 }
 
-async function loadCachedCatalog(): Promise<CachedCatalog> {
-  try {
-    const file = await fs.readFile(CATALOG_CACHE_PATH, 'utf8')
-    const data = JSON.parse(file)
-    if (Array.isArray(data?.products)) {
-      const products = data.products
-        .map((product: any) => normalizeProduct(product))
-        .filter(Boolean) as CachedCatalogProduct[]
-      return {
-        products,
-        fetchedAt: typeof data?.fetchedAt === 'string' ? data.fetchedAt : null,
-        source: typeof data?.source === 'string' ? data.source : null,
+interface FilteredVariant extends CatalogVariant {
+  matchedRegion: string | null
+}
+
+interface FilteredCatalogProduct {
+  id: number
+  name: string
+  type: string | null
+  brand: string | null
+  image: string | null
+  placements: CatalogPlacement[]
+  variants: FilteredVariant[]
+  priceMin: number | null
+  priceMax: number | null
+  colors: { name: string; code: string | null }[]
+  sizes: string[]
+  availableRegions: string[]
+}
+
+interface LoadedCatalog {
+  items: CatalogProduct[]
+  fetchedAt: string | null
+}
+
+const REGION_PRIORITY: Record<string, string[]> = {
+  US: ['US'],
+  CA: ['CA', 'US'],
+  BR: ['BR', 'US'],
+  MX: ['US', 'CA'],
+  AU: ['AU', 'US'],
+  NZ: ['AU', 'US'],
+  JP: ['JP', 'US'],
+  CN: ['CN', 'US'],
+  GB: ['UK', 'EU'],
+  UK: ['UK', 'EU'],
+  ES: ['EU_ES', 'EU'],
+  FR: ['EU', 'EU_ES'],
+  IT: ['EU'],
+  PT: ['EU'],
+  DE: ['EU'],
+  NL: ['EU'],
+  BE: ['EU'],
+  LV: ['EU_LV', 'EU'],
+}
+
+const REGION_FALLBACK = ['EU_ES', 'EU', 'US']
+const EUROPEAN_COUNTRIES = new Set([
+  'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV',
+  'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'NO', 'IS', 'LI', 'CH', 'MC'
+])
+
+let cachedCatalog: LoadedCatalog | null = null
+let cacheTimestamp = 0
+
+function coerceString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length ? trimmed : null
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+  return null
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+  return null
+}
+
+function normalizePlacements(source: any): CatalogPlacement[] {
+  const filesArray: any[] = Array.isArray(source?.files)
+    ? source.files
+    : Array.isArray(source)
+      ? source
+      : []
+
+  const placements = new Map<string, CatalogPlacement>()
+
+  filesArray.forEach((file) => {
+    if (!file) return
+    const code = coerceString(file.placement || file.type || file.id || file.title)
+    if (!code) return
+    const id = code.toLowerCase()
+    const label = coerceString(file.title || file.label || file.type || file.id || file.placement) || code
+    const additionalPrice = coerceNumber(file.additional_price ?? file.additionalPrice ?? null)
+
+    const existing = placements.get(id)
+    if (existing) {
+      if (additionalPrice !== null && (existing.additionalPrice === null || additionalPrice > existing.additionalPrice)) {
+        existing.additionalPrice = additionalPrice
       }
+      return
     }
-  } catch (error) {
-    // ignore load errors
-  }
-  return { products: [], fetchedAt: null, source: null }
+
+    placements.set(id, {
+      id,
+      label,
+      additionalPrice: additionalPrice !== null ? additionalPrice : null,
+    })
+  })
+
+  return Array.from(placements.values())
 }
 
-async function saveCatalogCache(
-  products: CachedCatalogProduct[],
-  source: string,
-  fetchedAt: string = new Date().toISOString(),
-) {
-  try {
-    const payload = {
-      fetchedAt,
-      source,
-      products,
-    }
-    await fs.mkdir(path.dirname(CATALOG_CACHE_PATH), { recursive: true })
-    await fs.writeFile(CATALOG_CACHE_PATH, JSON.stringify(payload, null, 2), 'utf8')
-  } catch (error) {
-    console.warn('[printful catalog] no pudimos guardar cache', error)
+function normalizeVariant(raw: any): CatalogVariant | null {
+  if (!raw) return null
+  const variantId = Number(raw.id ?? raw.variant_id)
+  if (!Number.isFinite(variantId) || variantId <= 0) {
+    return null
+  }
+
+  const availability: AvailabilityEntry[] = Array.isArray(raw.availability_status)
+    ? raw.availability_status
+        .map((entry: any) => ({
+          region: coerceString(entry?.region)?.toUpperCase(),
+          status: coerceString(entry?.status)?.toLowerCase(),
+        }))
+        .filter((entry: any): entry is AvailabilityEntry => Boolean(entry.region && entry.status))
+    : []
+
+  const regionSet = new Set<string>()
+  if (raw.availability_regions && typeof raw.availability_regions === 'object') {
+    Object.keys(raw.availability_regions).forEach((key) => {
+      const normalized = coerceString(key)?.toUpperCase()
+      if (normalized) {
+        regionSet.add(normalized)
+      }
+    })
+  }
+  if (Array.isArray(raw.available_regions)) {
+    raw.available_regions.forEach((value: any) => {
+      const normalized = coerceString(value)?.toUpperCase()
+      if (normalized) {
+        regionSet.add(normalized)
+      }
+    })
+  }
+  if (Array.isArray(raw.availableRegions)) {
+    raw.availableRegions.forEach((value: any) => {
+      const normalized = coerceString(value)?.toUpperCase()
+      if (normalized) {
+        regionSet.add(normalized)
+      }
+    })
+  }
+  availability.forEach(({ region }) => regionSet.add(region))
+
+  const size = coerceString(raw.size)
+  const color = coerceString(raw.color) || coerceString(raw.color_name)
+  const colorCode = coerceString(raw.color_code || raw.color_code2)?.toLowerCase() || null
+  const price = coerceNumber(raw.price ?? raw.variant_price ?? raw.retail_price)
+  const image =
+    coerceString(raw.product_image) ||
+    coerceString(raw.image) ||
+    coerceString(raw.preview_url) ||
+    null
+
+  const inStock = Boolean(raw.in_stock) || availability.some((entry) => IN_STOCK_STATUSES.has(entry.status))
+
+  return {
+    id: variantId,
+    size: size || null,
+    color: color || null,
+    colorCode,
+    price,
+    image,
+    inStock,
+    availability,
+    availableRegions: Array.from(regionSet),
   }
 }
 
-const LEGACY_CATALOG_FALLBACK = [
-  {
-    id: 71,
-    name: 'GILDAN 64000',
-    brand: 'Legacy',
-    model: 'gildan-64000',
-    type: 'T-SHIRT',
-    image: null,
-    variantsCount: null,
-  },
-]
-
-function parseInteger(value: string | null, fallback: number) {
-  if (!value) return fallback
-  const parsed = Number.parseInt(value, 10)
-  if (Number.isNaN(parsed) || parsed < 0) {
-    return fallback
+function normalizeProduct(raw: any, fetchedAt: string | null): CatalogProduct | null {
+  if (!raw || typeof raw !== 'object') {
+    return null
   }
-  return parsed
-}
 
-function normalizeProduct(product: any) {
-  if (!product) return null
-  const idCandidate = product.id ?? product.product_id ?? product.productId
+  const idCandidate = raw.productId ?? raw.id ?? raw.product_id ?? raw.templateId ?? raw.template_id
   const id = Number(idCandidate)
-  if (!id || Number.isNaN(id)) {
+  if (!Number.isFinite(id) || id <= 0) {
     return null
   }
 
   const name =
-    product.name ||
-    product.title ||
-    [product.brand, product.model || product.type]
-      .filter((value) => typeof value === 'string' && value.trim().length)
+    coerceString(raw.name) ||
+    coerceString(raw.title) ||
+    [coerceString(raw.brand), coerceString(raw.model) || coerceString(raw.type)]
+      .filter((value): value is string => Boolean(value && value.trim().length))
       .join(' ') ||
     `Producto ${id}`
 
+  const type =
+    coerceString(raw.producto) ||
+    coerceString(raw.type_name) ||
+    coerceString(raw.type) ||
+    null
+
+  const brand = coerceString(raw.brand)
+
   const image =
-    product.image ||
-    product.preview ||
-    product.thumbnail ||
-    (Array.isArray(product.images) && product.images.length ? product.images[0]?.url || product.images[0] : null) ||
-    (Array.isArray(product.variant_images) && product.variant_images.length ? product.variant_images[0] : null)
+    coerceString(raw.image) ||
+    coerceString(raw.preview) ||
+    coerceString(raw.thumbnail) ||
+    (Array.isArray(raw.images) && raw.images.length
+      ? coerceString(raw.images[0]?.url ?? raw.images[0])
+      : null)
+
+  const variantsSource: any[] = Array.isArray(raw.variants) ? raw.variants : []
+  const variants = variantsSource
+    .map((variant) => normalizeVariant(variant))
+    .filter((variant): variant is CatalogVariant => Boolean(variant))
+
+  const placements = normalizePlacements(raw.files || raw.placements)
 
   return {
     id,
     name,
-    type: product.type || null,
-    brand: product.brand || null,
-    model: product.model || null,
-    image: typeof image === 'string' ? image : null,
-    variantsCount: Array.isArray(product.variants) ? product.variants.length : product.variants_count ?? null,
+    type,
+    brand,
+    image,
+    variants,
+    placements,
+    fetchedAt,
+  }
+}
+
+async function loadCatalog(): Promise<LoadedCatalog> {
+  const now = Date.now()
+  if (cachedCatalog && now - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedCatalog
+  }
+
+  try {
+    const file = await fs.readFile(CATALOG_PATH, 'utf8')
+    const data: RawCatalogFile = JSON.parse(file)
+    const fetchedAt = typeof data?.fetchedAt === 'string' ? data.fetchedAt : null
+    const rawItems = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data?.products)
+        ? data.products
+        : []
+
+    const items = rawItems
+      .map((item) => normalizeProduct(item, fetchedAt))
+      .filter((item): item is CatalogProduct => Boolean(item))
+
+    cachedCatalog = { items, fetchedAt }
+    cacheTimestamp = now
+    return cachedCatalog
+  } catch (error) {
+    console.error('[printful catalog] no pudimos cargar printful-catalog-full.json', error)
+    cachedCatalog = { items: [], fetchedAt: null }
+    cacheTimestamp = now
+    return cachedCatalog
+  }
+}
+
+function detectCountry(request: NextRequest): string {
+  const geoCountry = (request.geo?.country as string | undefined) || null
+  const headerCountry =
+    request.headers.get('x-vercel-ip-country') ||
+    request.headers.get('cf-ipcountry') ||
+    request.headers.get('x-country-code')
+  return (geoCountry || headerCountry || 'ES').toUpperCase()
+}
+
+function resolveRegionsForCountry(countryCode: string): string[] {
+  if (REGION_PRIORITY[countryCode]) {
+    return REGION_PRIORITY[countryCode]
+  }
+  if (EUROPEAN_COUNTRIES.has(countryCode)) {
+    if (countryCode === 'ES') {
+      return REGION_PRIORITY.ES
+    }
+    if (countryCode === 'LV') {
+      return REGION_PRIORITY.LV
+    }
+    return ['EU']
+  }
+  return REGION_FALLBACK
+}
+
+function variantMatchesRegions(variant: CatalogVariant, regions: string[]): { matched: boolean; region: string | null } {
+  for (const region of regions) {
+    const availability = variant.availability.find((entry) => entry.region === region)
+    if (availability && IN_STOCK_STATUSES.has(availability.status)) {
+      return { matched: true, region }
+    }
+    if (variant.availableRegions.includes(region) && variant.inStock) {
+      return { matched: true, region }
+    }
+  }
+  return { matched: false, region: null }
+}
+
+function filterProductForRegions(product: CatalogProduct, regions: string[], typeFilter: string | null): FilteredCatalogProduct | null {
+  if (typeFilter) {
+    const typeValue = product.type?.toLowerCase() || ''
+    if (typeValue !== typeFilter.toLowerCase()) {
+      return null
+    }
+  }
+
+  const filteredVariants: FilteredVariant[] = []
+
+  product.variants.forEach((variant) => {
+    const { matched, region } = variantMatchesRegions(variant, regions)
+    if (matched) {
+      filteredVariants.push({ ...variant, matchedRegion: region })
+    }
+  })
+
+  if (!filteredVariants.length) {
+    return null
+  }
+
+  const priceValues = filteredVariants
+    .map((variant) => variant.price)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+
+  const priceMin = priceValues.length ? Math.min(...priceValues) : null
+  const priceMax = priceValues.length ? Math.max(...priceValues) : null
+
+  const colorMap = new Map<string, { name: string; code: string | null }>()
+  const sizeSet = new Set<string>()
+  const regionSet = new Set<string>()
+
+  filteredVariants.forEach((variant) => {
+    if (variant.color) {
+      const key = (variant.colorCode || variant.color).toLowerCase()
+      if (!colorMap.has(key)) {
+        colorMap.set(key, { name: variant.color, code: variant.colorCode })
+      }
+    }
+    if (variant.size) {
+      sizeSet.add(variant.size.toUpperCase())
+    }
+    variant.availableRegions.forEach((region) => regionSet.add(region))
+    variant.availability.forEach(({ region }) => regionSet.add(region))
+  })
+
+  const colors = Array.from(colorMap.values())
+  const sizes = Array.from(sizeSet.values())
+  const availableRegions = Array.from(regionSet.values())
+
+  return {
+    id: product.id,
+    name: product.name,
+    type: product.type,
+    brand: product.brand,
+    image: product.image,
+    placements: product.placements,
+    variants: filteredVariants,
+    priceMin,
+    priceMax,
+    colors,
+    sizes,
+    availableRegions,
   }
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const limit = Math.min(Math.max(parseInteger(searchParams.get('limit'), 50), 1), 200)
-  const offset = parseInteger(searchParams.get('offset'), 0)
-  const search = searchParams.get('search') || undefined
-  const category = searchParams.get('category') || undefined
-  const type = searchParams.get('type') || undefined
+  const limit = Number.parseInt(searchParams.get('limit') || '50', 10)
+  const offset = Number.parseInt(searchParams.get('offset') || '0', 10)
+  const typeFilter = searchParams.get('type') || searchParams.get('producto') || null
 
-  try {
-    const client = new PrintfulClient()
-    const params: Record<string, unknown> = { limit, offset }
-    if (search) params['search'] = search
-    if (category) params['category_id'] = category
-    if (type) params['type'] = type
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 200) : 50
+  const safeOffset = Number.isFinite(offset) && offset > 0 ? offset : 0
 
-    const response: any = await client.getCatalogProducts(params)
-    const payload = response?.result || response?.data || response
-    const rawProducts = Array.isArray(payload?.products)
-      ? payload.products
-      : Array.isArray(payload?.items)
-        ? payload.items
-        : []
+  const country = detectCountry(request)
+  const preferredRegions = resolveRegionsForCountry(country)
 
-    let products = rawProducts
-      .map(normalizeProduct)
-      .filter((product): product is CachedCatalogProduct => Boolean(product))
+  const catalog = await loadCatalog()
+  const normalizedTypeFilter = typeFilter ? typeFilter.trim().toLowerCase() : null
 
-    let responseSource: 'printful' | 'cache' | 'fallback' = 'printful'
-    let cachedAt: string | null = null
+  const filteredProducts = catalog.items
+    .map((item) => filterProductForRegions(item, preferredRegions, normalizedTypeFilter))
+    .filter((item): item is FilteredCatalogProduct => Boolean(item))
 
-    if (products.length) {
-      const fetchedAt = new Date().toISOString()
-      await saveCatalogCache(products, 'printful', fetchedAt)
-      cachedAt = fetchedAt
-    } else {
-      const cached = await loadCachedCatalog()
-      if (cached.products.length) {
-        products = cached.products
-        responseSource = 'cache'
-        cachedAt = cached.fetchedAt
-      } else {
-        products = [...LEGACY_CATALOG_FALLBACK]
-        responseSource = 'fallback'
-      }
+  const typeCounter = new Map<string, number>()
+  filteredProducts.forEach((item) => {
+    if (item.type) {
+      const key = item.type.toLowerCase()
+      typeCounter.set(key, (typeCounter.get(key) || 0) + 1)
     }
+  })
 
-    return NextResponse.json({
-      success: true,
-      source: responseSource,
-      products,
-      paging: payload?.paging || null,
-      cachedAt,
-    })
-  } catch (error) {
-    console.error('Error fetching Printful catalog products', error)
-    const cached = await loadCachedCatalog()
-    if (cached.products.length) {
-      return NextResponse.json({
-        success: true,
-        source: 'cache',
-        products: cached.products,
-        paging: null,
-        cachedAt: cached.fetchedAt,
-        error: error instanceof Error ? error.message : 'No pudimos cargar el catalogo real de Printful',
-      })
+  filteredProducts.sort((a, b) => {
+    const aPrice = typeof a.priceMin === 'number' ? a.priceMin : Number.POSITIVE_INFINITY
+    const bPrice = typeof b.priceMin === 'number' ? b.priceMin : Number.POSITIVE_INFINITY
+    if (aPrice !== bPrice) {
+      return aPrice - bPrice
     }
-    return NextResponse.json(
-      {
-        success: true,
-        source: 'fallback',
-        products: [...LEGACY_CATALOG_FALLBACK],
-        paging: null,
-        cachedAt: null,
-        error: error instanceof Error ? error.message : 'No pudimos cargar el catalogo real de Printful',
-      },
-      { status: 200 },
-    )
-  }
+    return a.name.localeCompare(b.name)
+  })
+
+  const total = filteredProducts.length
+  const pageItems = filteredProducts.slice(safeOffset, safeOffset + safeLimit)
+
+  const typeOptions = Array.from(typeCounter.entries())
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => a.value.localeCompare(b.value))
+
+  return NextResponse.json({
+    success: true,
+    country,
+    regions: preferredRegions,
+    fetchedAt: catalog.fetchedAt,
+    total,
+    paging: {
+      limit: safeLimit,
+      offset: safeOffset,
+    },
+    typeOptions,
+    items: pageItems,
+    products: pageItems,
+  })
 }
+
+
+
+

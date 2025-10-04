@@ -63,14 +63,44 @@ interface ProductData {
   message?: string | null
 }
 
-interface CatalogProduct {
+interface CatalogPlacementSummary {
+  id: string
+  label: string
+  additionalPrice: number | null
+}
+
+interface CatalogVariantSummary {
+  id: number
+  size: string | null
+  color: string | null
+  colorCode: string | null
+  price: number | null
+  image: string | null
+  inStock: boolean
+  availability: { region: string; status: string }[]
+  availableRegions: string[]
+}
+
+interface CatalogItem {
   id: number
   name: string
   type: string | null
   brand: string | null
-  model: string | null
   image: string | null
+  placements: CatalogPlacementSummary[]
+  variants: CatalogVariantSummary[]
+  priceMin: number | null
+  priceMax: number | null
+  colors: { name: string; code: string | null }[]
+  sizes: string[]
+  availableRegions: string[]
 }
+
+interface CatalogTypeOption {
+  value: string
+  count: number
+}
+
 
 type DesignsByPlacement = Record<string, string>
 
@@ -252,13 +282,698 @@ function normalizeVariantMockups(source: VariantMockupsFromApi | undefined | nul
   return normalized
 }
 
-function formatCatalogOptionLabel(product: CatalogProduct): string {
-  const extra = [product.brand, product.model || product.type]
-    .filter((value) => typeof value === 'string' && value.trim().length)
-    .join(' ')
-  const base = `#${product.id} - ${product.name}`
-  return extra ? `${base} | ${extra}` : base
+function formatPriceValue(value: number | null | undefined): string | null {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null
+  }
+  return value.toFixed(2)
 }
+
+function formatPriceRange(min: number | null | undefined, max: number | null | undefined): string | null {
+  const minValue = formatPriceValue(min)
+  const maxValue = formatPriceValue(max)
+  if (minValue && maxValue) {
+    return minValue == maxValue ? minValue : `${minValue} - ${maxValue}`
+  }
+  return minValue || maxValue
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length ? trimmed : null
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+  return null
+}
+
+function normalizeOptionalNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+  return null
+}
+
+function normalizeAvailabilityEntries(source: any): { region: string; status: string }[] {
+  if (!Array.isArray(source)) {
+    return []
+  }
+  const entries: { region: string; status: string }[] = []
+  source.forEach((entry) => {
+    const region = normalizeOptionalString(entry?.region)
+    const status = normalizeOptionalString(entry?.status)
+    if (region && status) {
+      entries.push({ region, status })
+    }
+  })
+  return entries
+}
+
+function normalizeCatalogVariantSummary(source: any): CatalogVariantSummary | null {
+  const id = normalizeOptionalNumber(source?.id)
+  if (!id || id <= 0) {
+    return null
+  }
+  const size = normalizeOptionalString(source?.size)
+  const color = normalizeOptionalString(source?.color)
+  const colorCode = normalizeOptionalString(source?.colorCode)
+  const price = normalizeOptionalNumber(source?.price)
+  const image = normalizeOptionalString(source?.image)
+
+  const availability = normalizeAvailabilityEntries(source?.availability)
+  const availableRegions = Array.isArray(source?.availableRegions)
+    ? source.availableRegions
+        .map((value: any) => normalizeOptionalString(value))
+        .filter((value: any): value is string => Boolean(value))
+    : []
+
+  const inStock =
+    typeof source?.inStock === 'boolean'
+      ? source.inStock
+      : availability.some((entry) => entry.status === 'in_stock' || entry.status === 'stocked_on_demand')
+
+  return {
+    id,
+    size,
+    color,
+    colorCode,
+    price,
+    image,
+    inStock,
+    availability,
+    availableRegions,
+  }
+}
+
+function normalizeCatalogPlacementSummary(source: any): CatalogPlacementSummary | null {
+  const id = normalizeOptionalString(source?.id) || normalizeOptionalString(source?.placement)
+  const label = normalizeOptionalString(source?.label) || id
+  if (!id || !label) {
+    return null
+  }
+  const additionalPrice = normalizeOptionalNumber(source?.additionalPrice)
+  return {
+    id,
+    label,
+    additionalPrice,
+  }
+}
+
+function normalizeCatalogItem(source: any): CatalogItem | null {
+  const id = normalizeOptionalNumber(source?.id)
+  if (!id || id <= 0) {
+    return null
+  }
+  const name = normalizeOptionalString(source?.name) || `Producto ${id}`
+  const type = normalizeOptionalString(source?.type)
+  const brand = normalizeOptionalString(source?.brand)
+  const image = normalizeOptionalString(source?.image)
+
+  const placements = Array.isArray(source?.placements)
+    ? source.placements
+        .map((placement: any) => normalizeCatalogPlacementSummary(placement))
+        .filter((placement: any): placement is CatalogPlacementSummary => Boolean(placement))
+    : []
+
+  const variants = Array.isArray(source?.variants)
+    ? source.variants
+        .map((variant: any) => normalizeCatalogVariantSummary(variant))
+        .filter((variant: any): variant is CatalogVariantSummary => Boolean(variant))
+    : []
+
+  const priceMin = normalizeOptionalNumber(source?.priceMin)
+  const priceMax = normalizeOptionalNumber(source?.priceMax)
+
+  const colors = Array.isArray(source?.colors)
+    ? source.colors
+        .map((color: any) => {
+          const nameValue = normalizeOptionalString(color?.name)
+          const codeValue = normalizeOptionalString(color?.code)
+          const safeName = nameValue || codeValue || 'Color'
+          if (!safeName) {
+            return null
+          }
+          return {
+            name: safeName,
+            code: codeValue,
+          }
+        })
+        .filter((color: any): color is { name: string; code: string | null } => Boolean(color))
+    : []
+
+  const sizes = Array.isArray(source?.sizes)
+    ? source.sizes
+        .map((size: any) => normalizeOptionalString(size))
+        .filter((size: any): size is string => Boolean(size))
+    : []
+
+  const availableRegions = Array.isArray(source?.availableRegions)
+    ? source.availableRegions
+        .map((region: any) => normalizeOptionalString(region))
+        .filter((region: any): region is string => Boolean(region))
+    : []
+
+  return {
+    id,
+    name,
+    type,
+    brand,
+    image,
+    placements,
+    variants,
+    priceMin,
+    priceMax,
+    colors,
+    sizes,
+    availableRegions,
+  }
+}
+
+function normalizeCatalogItems(raw: any): CatalogItem[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw
+    .map((item) => normalizeCatalogItem(item))
+    .filter((item): item is CatalogItem => Boolean(item))
+}
+
+function normalizeCatalogTypeOptions(raw: any): CatalogTypeOption[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw
+    .map((entry) => {
+      const value = normalizeOptionalString(entry?.value)
+      if (!value) {
+        return null
+      }
+      const count = normalizeOptionalNumber(entry?.count)
+      return {
+        value: value.toLowerCase(),
+        count: typeof count === 'number' && Number.isFinite(count) ? count : 0,
+      }
+    })
+    .filter((option): option is CatalogTypeOption => Boolean(option))
+    .sort((a, b) => a.value.localeCompare(b.value))
+}
+
+function createPlaceholderCatalogItem({
+  id,
+  name,
+  type,
+  brand,
+  image,
+}: {
+  id: number
+  name?: string | null
+  type?: string | null
+  brand?: string | null
+  image?: string | null
+}): CatalogItem {
+  const safeId = Number.isFinite(id) && id > 0 ? id : DEFAULT_PRODUCT_ID
+  const safeName = normalizeOptionalString(name) || `Producto ${safeId}`
+  const safeType = normalizeOptionalString(type)
+  const safeBrand = normalizeOptionalString(brand)
+  const safeImage = normalizeOptionalString(image)
+
+  return {
+    id: safeId,
+    name: safeName,
+    type: safeType,
+    brand: safeBrand,
+    image: safeImage,
+    placements: [],
+    variants: [],
+    priceMin: null,
+    priceMax: null,
+    colors: [],
+    sizes: [],
+    availableRegions: [],
+  }
+}
+
+function buildCatalogItemFromProductData(productData: ProductData | null): CatalogItem | null {
+  if (!productData) {
+    return null
+  }
+
+  const placements = normalizePlacements(productData.placements).map((placement) => ({
+    id: placement.placement,
+    label: placement.label || placement.placement,
+    additionalPrice: null,
+  }))
+
+  const variants = productData.variants.map((variant) => ({
+    id: variant.id,
+    size: variant.size || null,
+    color: variant.colorName || null,
+    colorCode: variant.colorCode || null,
+    price: null,
+    image: variant.imageUrl || null,
+    inStock: variant.availability ? variant.availability !== 'out_of_stock' : true,
+    availability: variant.availability ? [{ region: 'default', status: variant.availability }] : [],
+    availableRegions: [],
+  }))
+
+  const colors = productData.colors.map((color) => {
+    const nameValue = normalizeOptionalString(color.name) || normalizeOptionalString(color.code) || 'Color'
+    const codeValue = normalizeOptionalString(color.code)
+    return {
+      name: nameValue,
+      code: codeValue,
+    }
+  })
+
+  const sizes = productData.sizes
+    .map((size) => normalizeOptionalString(size))
+    .filter((size): size is string => Boolean(size))
+
+  return {
+    id: productData.productId,
+    name: productData.name,
+    type: productData.type,
+    brand: productData.brand,
+    image: productData.image,
+    placements,
+    variants,
+    priceMin: null,
+    priceMax: null,
+    colors,
+    sizes,
+    availableRegions: [],
+  }
+}
+
+interface CatalogSelectorProps {
+  selectedId: number | null
+  onSelect: (productId: number) => void
+  fallbackItem?: CatalogItem | null
+  className?: string
+  autoCollapseOnSelect?: boolean
+  confirmedProductId?: number | null
+  onConfirmProduct?: (productId: number) => void
+}
+
+function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className, autoCollapseOnSelect = true, confirmedProductId, onConfirmProduct }: CatalogSelectorProps) {
+  const [items, setItems] = useState<CatalogItem[]>(() => (fallbackItem ? [fallbackItem] : []))
+  const [typeOptions, setTypeOptions] = useState<CatalogTypeOption[]>([])
+  const [selectedType, setSelectedType] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [country, setCountry] = useState<string | null>(null)
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null)
+  
+  // Estados para controlar el flujo de selección
+  const [tentativeSelection, setTentativeSelection] = useState<number | null>(null)
+  const [confirmedSelection, setConfirmedSelection] = useState<number | null>(selectedId)
+
+  const abortRef = useRef<AbortController | null>(null)
+  const fallbackRef = useRef<CatalogItem | null>(fallbackItem)
+  const [collapsed, setCollapsed] = useState(() => (autoCollapseOnSelect && selectedId ? selectedId !== DEFAULT_PRODUCT_ID : false))
+
+  useEffect(() => {
+    fallbackRef.current = fallbackItem
+    if (!fallbackItem) {
+      return
+    }
+    setItems((prev) => {
+      const exists = prev.some((item) => item.id === fallbackItem.id)
+      if (exists) {
+        return prev.map((item) => (item.id === fallbackItem.id ? { ...item, ...fallbackItem } : item))
+      }
+      return [fallbackItem, ...prev]
+    })
+    if (fallbackItem.type) {
+      setTypeOptions((prev) => {
+        const normalizedValue = fallbackItem.type!.toLowerCase()
+        if (prev.some((option) => option.value === normalizedValue)) {
+          return prev
+        }
+        return [...prev, { value: normalizedValue, count: 1 }].sort((a, b) => a.value.localeCompare(b.value))
+      })
+    }
+  }, [fallbackItem])
+
+  useEffect(() => {
+    setConfirmedSelection(selectedId)
+  }, [selectedId])
+
+  useEffect(() => {
+    if (!autoCollapseOnSelect) {
+      return
+    }
+    if (!selectedId) {
+      setCollapsed(false)
+    }
+  }, [autoCollapseOnSelect, selectedId])
+
+  const fetchCatalog = useCallback(async () => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setError(null)
+
+    try {
+      const timeout = setTimeout(() => controller.abort(), 12000)
+      const response = await fetch('/api/printful/products?limit=200', { signal: controller.signal })
+      clearTimeout(timeout)
+      const data = await response.json()
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.error || 'No pudimos obtener el catálogo')
+      }
+
+      const normalizedItems = normalizeCatalogItems(Array.isArray(data?.items) ? data.items : data?.products)
+      const fallbackValue = fallbackRef.current
+      const normalizedTypes = normalizeCatalogTypeOptions(data?.typeOptions)
+
+      const fallbackType = fallbackValue?.type ? fallbackValue.type.toLowerCase() : null
+      const mergedTypeOptions =
+        fallbackType && !normalizedTypes.some((option) => option.value === fallbackType)
+          ? [...normalizedTypes, { value: fallbackType, count: 1 }].sort((a, b) => a.value.localeCompare(b.value))
+          : normalizedTypes
+
+      setItems(() => {
+        const nextItems = normalizedItems.slice()
+        if (fallbackValue) {
+          const index = nextItems.findIndex((item) => item.id === fallbackValue.id)
+          if (index >= 0) {
+            nextItems[index] = { ...nextItems[index], ...fallbackValue }
+          } else {
+            nextItems.unshift(fallbackValue)
+          }
+        }
+        return nextItems
+      })
+
+      setTypeOptions(mergedTypeOptions)
+
+      const countryValue = normalizeOptionalString(data?.country)
+      setCountry(countryValue ? countryValue.toUpperCase() : null)
+      setFetchedAt(normalizeOptionalString(data?.fetchedAt))
+    } catch (fetchError) {
+      if (controller.signal.aborted) {
+        return
+      }
+      const message =
+        fetchError instanceof Error && fetchError.name !== 'AbortError'
+          ? fetchError.message
+          : 'No pudimos obtener el catálogo'
+      setError(message)
+      toast.error(message)
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCatalog()
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort()
+      }
+    }
+  }, [fetchCatalog])
+
+  const normalizedType = selectedType.trim().toLowerCase()
+  
+  // Lista de productos filtrados para el dropdown
+  const filteredItems = useMemo(() => {
+    let list = items
+    if (normalizedType) {
+      list = list.filter((item) => (item.type || '').toLowerCase().includes(normalizedType))
+    }
+    const trimmedSearch = searchTerm.trim().toLowerCase()
+    if (trimmedSearch) {
+      list = list.filter((item) => {
+      const haystack = [String(item.id), item.name, item.brand, item.type]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(trimmedSearch)
+    })
+    }
+    return list
+  }, [items, normalizedType, searchTerm])
+
+  const confirmedItem = useMemo(() => {
+    // Para opciones de personalización, solo usar confirmedSelection
+    const targetId = confirmedSelection || selectedId
+    if (!targetId) {
+      return null
+    }
+    return filteredItems.find((item) => item.id === targetId) || items.find((item) => item.id === targetId) || fallbackRef.current
+  }, [filteredItems, items, confirmedSelection, selectedId])
+
+  useEffect(() => {
+    if (!collapsed) {
+      return
+    }
+    if (!confirmedItem) {
+      setCollapsed(false)
+    }
+  }, [collapsed, confirmedItem])
+
+  const formattedFetchedAt = useMemo(() => {
+    if (!fetchedAt) {
+      return null
+    }
+    const timestamp = Date.parse(fetchedAt)
+    if (Number.isNaN(timestamp)) {
+      return fetchedAt
+    }
+    try {
+      return new Date(timestamp).toLocaleString()
+    } catch {
+      return fetchedAt
+    }
+  }, [fetchedAt])
+
+  const formatTypeLabel = useCallback((value: string) => {
+    return value
+      .split(/[_\s]+/)
+      .filter(Boolean)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ')
+  }, [])
+
+  const handleDropdownSelect = useCallback(
+    (productId: string) => {
+      const numericValue = Number(productId)
+      if (!Number.isFinite(numericValue) || numericValue <= 0) {
+        setTentativeSelection(null)
+        return
+      }
+      setTentativeSelection(numericValue)
+      
+      // Renderizar inmediatamente al seleccionar
+      if (autoCollapseOnSelect) {
+        setCollapsed(true)
+      }
+      
+      if (numericValue !== selectedId) {
+        onSelect(numericValue)
+      }
+    },
+    [autoCollapseOnSelect, onSelect, selectedId],
+  )
+
+  const handleConfirmSelection = useCallback(
+    () => {
+      if (!tentativeSelection) {
+        toast.error('Selecciona un producto primero')
+        return
+      }
+      
+      // Confirmar la selección final
+      setConfirmedSelection(tentativeSelection)
+      setTentativeSelection(null)
+      
+      // Notificar al componente padre
+      if (onConfirmProduct) {
+        onConfirmProduct(tentativeSelection)
+      }
+    },
+    [tentativeSelection, onConfirmProduct],
+  )
+
+  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value)
+  }, [])
+
+  const handleTypeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedType(event.target.value)
+  }, [])
+
+  const containerClassName = ['rounded-2xl border border-gray-200 bg-white p-4', className].filter(Boolean).join(' ')
+  const totalItems = items.length
+  const displayCount = filteredItems.length
+
+  const canToggleCatalog = Boolean(selectedId)
+  const toggleLabel = collapsed ? 'Cambiar producto' : 'Ocultar catalogo'
+
+  return (
+    <div className={containerClassName}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <label className="text-xs font-semibold text-gray-500">Producto</label>
+          <p className="text-[11px] text-gray-500">
+            {country ? `Region detectada: ${country}` : 'Region predeterminada: ES'}
+            {formattedFetchedAt ? ` - Actualizado ${formattedFetchedAt}` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canToggleCatalog && (
+            <button
+              type="button"
+              onClick={() => setCollapsed((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 transition hover:border-gray-300 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {toggleLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={fetchCatalog}
+            disabled={loading}
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 transition hover:border-gray-300 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin text-primary-500' : ''}`} />
+            {loading ? 'Actualizando' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {!collapsed && (
+        <div className="mt-3 space-y-3">
+          {/* Filtros */}
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
+            <input
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Buscar por nombre, marca o ID"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <select
+              value={selectedType}
+              onChange={handleTypeChange}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="">Todos los tipos</option>
+              {typeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {formatTypeLabel(option.value)} ({option.count})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dropdown de productos */}
+          <div>
+            <select
+              value={tentativeSelection ? String(tentativeSelection) : ''}
+              onChange={(e) => handleDropdownSelect(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="">
+                {filteredItems.length > 0 
+                  ? `Selecciona un producto (${filteredItems.length} disponibles)` 
+                  : 'No hay productos disponibles'
+                }
+              </option>
+              {filteredItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  #{item.id} - {item.name} {item.brand ? `(${item.brand})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-gray-500">
+              Selecciona un producto de la lista filtrada para continuar.
+            </p>
+          </div>
+
+          {/* Botón de confirmación */}
+          {tentativeSelection && !confirmedSelection && (
+            <div className="text-center">
+            <button
+                type="button"
+                onClick={handleConfirmSelection}
+                className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+                <Check className="mr-2 h-4 w-4" />
+                Confirmar Selección
+            </button>
+            </div>
+          )}
+
+          {/* Botón para cambiar producto */}
+          {confirmedSelection && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmedSelection(null)
+                  setTentativeSelection(null)
+                  setCollapsed(false)
+                }}
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Cambiar Producto
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && <p className="mt-2 text-xs text-orange-600">{error}</p>}
+
+      {confirmedItem && (
+        <div className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+          <p className="font-semibold text-gray-900">#{confirmedItem.id} - {confirmedItem.name}</p>
+          <p>
+            {confirmedItem.brand ? `${confirmedItem.brand} - ` : ''}
+            {confirmedItem.type ? formatTypeLabel(confirmedItem.type) : 'Sin tipo'}
+          </p>
+          {collapsed && (
+            <p className="mt-2 text-[11px] text-gray-500">Catalogo oculto. Pulsa el boton Cambiar producto para volver a ver el catalogo.</p>
+          )}
+        </div>
+      )}
+
+      {loading && items.length === 0 && (
+        <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
+          Cargando catálogo...
+            </div>
+      )}
+
+      {!loading && filteredItems.length === 0 && !collapsed && (
+        <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+              No encontramos productos con los filtros actuales.
+            </div>
+      )}
+    </div>
+  )
+}
+
+
 
 export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData }: PrintfulDesignEditorProps) {
   const [selectedProductId, setSelectedProductId] = useState<number>(() => {
@@ -268,12 +983,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     }
     return DEFAULT_PRODUCT_ID
   })
-  const [manualProductCode, setManualProductCode] = useState(() => String(selectedProductId))
-  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([])
-  const [catalogFetchedAt, setCatalogFetchedAt] = useState<string | null>(null)
-  const [loadingCatalog, setLoadingCatalog] = useState(true)
-  const [catalogError, setCatalogError] = useState<string | null>(null)
-  const [catalogSearchTerm, setCatalogSearchTerm] = useState('')
+  const [confirmedProductId, setConfirmedProductId] = useState<number | null>(null)
   const [loadingProduct, setLoadingProduct] = useState(true)
   const [productData, setProductData] = useState<ProductData | null>(null)
   const [designsByPlacement, setDesignsByPlacement] = useState<DesignsByPlacement>({})
@@ -284,50 +994,42 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   const [selectedColorCode, setSelectedColorCode] = useState('')
   const [activePlacement, setActivePlacement] = useState('front')
   const [uploading, setUploading] = useState(false)
+  const [qrPlacement, setQrPlacement] = useState<string | null>(null) // Dónde está colocado el QR
+  const [qrPlaced, setQrPlaced] = useState(false) // Si el QR ya fue colocado
   const [generatingMockup, setGeneratingMockup] = useState(false)
   const [lastError, setLastError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const activeTaskRef = useRef<{ key: string; variantId: number } | null>(null)
   const lastInitializedProductIdRef = useRef<number | null>(null)
-  const catalogFetchedRef = useRef(false)
+
+  const fallbackCatalogItem = useMemo(() => {
+    const fromProductData = buildCatalogItemFromProductData(productData)
+    if (fromProductData) {
+      return fromProductData
+    }
+
+    const id = Number.isFinite(selectedProductId) && selectedProductId > 0 ? selectedProductId : DEFAULT_PRODUCT_ID
+    const savedProductDetails =
+      (savedDesignData?.printfulProduct as any) || (savedDesignData?.printful?.product as any) || null
+
+    const name = normalizeOptionalString(savedProductDetails?.name) || `Producto ${id}`
+    const type = normalizeOptionalString(savedProductDetails?.type)
+    const brand = normalizeOptionalString(savedProductDetails?.brand)
+    const image = normalizeOptionalString(savedProductDetails?.image)
+
+    return createPlaceholderCatalogItem({
+      id,
+      name,
+      type,
+      brand,
+      image,
+    })
+  }, [productData, savedDesignData, selectedProductId])
 
   const placementList = useMemo(() => normalizePlacements(productData?.placements), [productData?.placements])
 
-  const filteredCatalogProducts = useMemo(() => {
-    if (!catalogSearchTerm.trim()) {
-      return catalogProducts
-    }
-    const term = catalogSearchTerm.trim().toLowerCase()
-    return catalogProducts.filter((product) => {
-      const haystack = [
-        product.name,
-        product.brand,
-        product.model,
-        product.type,
-        product.id ? String(product.id) : '',
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(term)
-    })
-  }, [catalogProducts, catalogSearchTerm])
 
-  const trimmedCatalogSearch = catalogSearchTerm.trim()
-  const showNoCatalogResultsHint = Boolean(trimmedCatalogSearch) && filteredCatalogProducts.length === 0
-  const showCatalogLoading = loadingCatalog && catalogProducts.length === 0
-
-  const catalogOptions = showNoCatalogResultsHint ? catalogProducts : filteredCatalogProducts
-
-  const fallbackCatalogProduct = useMemo(() => ({
-    id: selectedProductId || DEFAULT_PRODUCT_ID,
-    name: productData?.name || `Producto ${selectedProductId || DEFAULT_PRODUCT_ID}`,
-    type: productData?.type || null,
-    brand: productData?.brand || null,
-    model: productData?.model || null,
-    image: productData?.image || null,
-  }), [productData, selectedProductId])
 
   const updateDesignMetadata = useCallback((placementKey: string, width: number, height: number) => {
     setDesignMetadata((prev) => {
@@ -362,6 +1064,31 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     return productData.variants.find((variant) => variant.id === selectedVariantId) || null
   }, [productData, selectedVariantId])
 
+  const confirmedItem = useMemo(() => {
+    // Para opciones de personalización, solo usar confirmedProductId
+    const targetId = confirmedProductId || selectedProductId
+    if (!targetId) {
+      return null
+    }
+    return productData
+  }, [confirmedProductId, selectedProductId, productData])
+
+  const selectedItem = useMemo(() => {
+    // Para renderizar imagen, usar el producto seleccionado actual
+    if (!selectedProductId) {
+      return null
+    }
+    return productData ? {
+      id: productData.productId,
+      name: productData.name,
+      brand: productData.brand || '',
+      type: productData.type || '',
+      image: productData.image || '',
+      availableRegions: [],
+      sizes: productData.sizes || []
+    } : null
+  }, [selectedProductId, productData])
+
   const currentVariantMockups = useMemo(() => {
     if (!selectedVariantId) return {}
     return variantMockups[selectedVariantId] || {}
@@ -378,8 +1105,9 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       const response = await fetch(`/api/printful/products/${productId}`)
       const data = await response.json()
       if (!response.ok || data.error) {
-        throw new Error(data.error || 'No pudimos obtener el producto de Printful')
+        throw new Error(data.error || 'No pudimos obtener el producto')
       }
+
 
       const placements = normalizePlacements(Array.isArray(data.placements) ? data.placements : null)
 
@@ -394,7 +1122,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
               availability: variant.availability || null,
               imageUrl: variant.imageUrl || variant.image || null,
             }))
-            .filter((variant) => !Number.isNaN(variant.id))
+            .filter((variant: any) => !Number.isNaN(variant.id))
         : []
 
       const normalizedColors: ProductColor[] = Array.isArray(data.colors)
@@ -410,7 +1138,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
       const sizes: string[] = Array.isArray(data.sizes)
         ? data.sizes.map((size: any) => String(size).toUpperCase())
-        : [...new Set(normalizedVariants.map((variant) => variant.size).filter(Boolean))]
+        : Array.from(new Set(normalizedVariants.map((variant) => variant.size).filter(Boolean)))
 
       setProductData({
         productId: Number(data.productId || data.templateId || productId),
@@ -434,7 +1162,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       }
     } catch (error) {
       console.error('Error fetching Printful product', error)
-      const message = error instanceof Error ? error.message : 'No pudimos cargar los datos de Printful. Intenta de nuevo.'
+      const message = error instanceof Error ? error.message : 'No pudimos cargar los datos del producto. Intenta de nuevo.'
       setLastError(message)
       setProductData(null)
       setStatusMessage(null)
@@ -443,110 +1171,6 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       setLoadingProduct(false)
     }
   }
-
-  useEffect(() => {
-    setManualProductCode(String(selectedProductId))
-  }, [selectedProductId])
-
-  useEffect(() => {
-    if (catalogFetchedRef.current) {
-      return
-    }
-
-    let isMounted = true
-
-    setCatalogProducts((prev) => (prev.length ? prev : [fallbackCatalogProduct]))
-    setLoadingCatalog(false)
-
-    const fetchCatalog = async () => {
-      catalogFetchedRef.current = true
-      setLoadingCatalog(true)
-      setCatalogError(null)
-      try {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 12000)
-        const response = await fetch('/api/printful/products?limit=200', { signal: controller.signal })
-        clearTimeout(timeout)
-        const data = await response.json()
-        if (!response.ok || !Array.isArray(data.products)) {
-          throw new Error(data.error || 'No pudimos obtener el catalogo de Printful')
-        }
-        if (!isMounted) {
-          return
-        }
-        const incoming = Array.isArray(data.products) ? data.products : []
-        const normalized = incoming
-          .map((product: any) => {
-            const id = Number(product.id)
-            if (!Number.isFinite(id) || id <= 0) {
-              return null
-            }
-            const name =
-              typeof product.name === 'string' && product.name.trim().length
-                ? product.name
-                : `Producto ${id}`
-            return {
-              id,
-              name,
-              type:
-                typeof product.type === 'string' && product.type.trim().length ? product.type : null,
-              brand:
-                typeof product.brand === 'string' && product.brand.trim().length ? product.brand : null,
-              model:
-                typeof product.model === 'string' && product.model.trim().length ? product.model : null,
-              image:
-                typeof product.image === 'string' && product.image.trim().length ? product.image : null,
-            }
-          })
-          .filter((product): product is CatalogProduct => Boolean(product))
-        if (!normalized.length) {
-          setCatalogProducts([fallbackCatalogProduct])
-          setCatalogError(data.error || 'No pudimos obtener productos desde Printful. Usamos el fallback.')
-        } else {
-          setCatalogProducts(normalized)
-          setCatalogError(null)
-        }
-      } catch (error) {
-        console.error('Error fetching Printful catalog', error)
-        if (!isMounted) {
-          return
-        }
-        setCatalogProducts((prev) => (prev.length ? prev : [fallbackCatalogProduct]))
-        setCatalogError(error instanceof Error ? error.message : 'No pudimos obtener el catalogo de Printful')
-      } finally {
-        if (isMounted) {
-          setLoadingCatalog(false)
-        }
-      }
-    }
-
-    fetchCatalog()
-
-    return () => {
-      isMounted = false
-    }
-  }, [fallbackCatalogProduct])
-
-  useEffect(() => {
-    if (!productData) {
-      return
-    }
-    setCatalogProducts((prev) => {
-      if (prev.some((product) => product.id === productData.productId)) {
-        return prev
-      }
-      const nextProduct: CatalogProduct = {
-        id: productData.productId,
-        name: productData.name,
-        type: productData.type,
-        brand: productData.brand,
-        model: productData.model,
-        image: productData.image,
-      }
-      return [nextProduct, ...prev]
-    })
-  }, [productData])
-
   useEffect(
     () => () => {
       if (pollTimeoutRef.current) {
@@ -557,6 +1181,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   )
 
   useEffect(() => {
+    // Cargar el producto cuando se selecciona (para mostrar áreas de impresión)
     if (!selectedProductId) {
       return
     }
@@ -590,6 +1215,8 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       Number.isFinite(savedProductIdCandidate) && savedProductIdCandidate === productData.productId
 
     const nextDesigns = { ...baseDesigns }
+    let qrPlacedFromSaved = false
+    let qrPlacementFromSaved: string | null = null
 
     if (matchesSavedProduct) {
       Object.entries(savedPlacements as Record<string, any>).forEach(([placement, value]) => {
@@ -598,10 +1225,20 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         }
         if (typeof value === 'string' && value) {
           nextDesigns[placement] = value
+          // Detectar si es un QR (por el nombre del archivo o URL)
+          if (value.includes('-qr.png') || value.includes('qr')) {
+            qrPlacedFromSaved = true
+            qrPlacementFromSaved = placement
+          }
           return
         }
         if (value?.imageUrl) {
           nextDesigns[placement] = value.imageUrl
+          // Detectar si es un QR
+          if (value.imageUrl.includes('-qr.png') || value.imageUrl.includes('qr')) {
+            qrPlacedFromSaved = true
+            qrPlacementFromSaved = placement
+          }
         }
       })
     }
@@ -681,6 +1318,10 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     setSelectedColorCode(nextColorCode)
     setActivePlacement(nextActivePlacement)
     setStatusMessage(nextStatus)
+    
+    // Actualizar estados del QR
+    setQrPlaced(qrPlacedFromSaved)
+    setQrPlacement(qrPlacementFromSaved)
 
     if (typeof window !== 'undefined') {
       Object.entries(nextDesigns).forEach(([placementKey, url]) => {
@@ -762,6 +1403,12 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         return next
       })
     }
+    
+    // Si se quita el QR, resetear el estado del QR
+    if (qrPlacement === placement) {
+      setQrPlacement(null)
+      setQrPlaced(false)
+    }
   }
 
   const handleProductChange = (value: number) => {
@@ -788,39 +1435,71 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     setProductData(null)
     setLoadingProduct(true)
     lastInitializedProductIdRef.current = null
-    setManualProductCode(String(value))
-
     setSelectedProductId(value)
   }
 
-  const handleCatalogSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setCatalogSearchTerm(event.target.value)
-  }
+  const handleQrPlacement = async (placement: string) => {
+    if (!productData) return
+    
+    setUploading(true)
+    try {
+      // DEBUG: Verificar qué está recibiendo el componente
+      console.log('=== QR PLACEMENT DEBUG ===')
+      console.log('qrCode prop recibido:', qrCode)
+      console.log('qrCode type:', typeof qrCode)
+      console.log('qrCode length:', qrCode?.length)
+      
+      // Generar imagen QR desde el código usando función estándar
+      const { generateStandardQR } = await import('@/lib/qr-generator')
+      const qrDataUrl = await generateStandardQR(qrCode)
+      
+      // Convertir data URL a Blob y luego a File
+      const qrResponse = await fetch(qrDataUrl)
+      const blob = await qrResponse.blob()
+      const qrFile = new File([blob], `qr-${qrCode}.png`, { type: 'image/png' })
+      
+      // Subir el QR como archivo
+      const formData = new FormData()
+      formData.append('file', qrFile)
+      formData.append('code', `${qrCode}-${placement}`)
+      formData.append('placement', placement)
 
-  const handleCatalogProductChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const { value } = event.target
-    if (!value) {
-      return
-    }
-    const numericValue = Number(value)
-    if (!Number.isFinite(numericValue) || numericValue <= 0) {
-      return
-    }
-    handleProductChange(numericValue)
-  }
+      const response = await fetch('/api/design/upload-qr', {
+        method: 'POST',
+        body: formData,
+      })
 
-  const handleManualProductInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setManualProductCode(event.target.value)
-  }
+      const data = await response.json()
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error al colocar QR')
+      }
 
-  const handleManualProductSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const value = Number(manualProductCode.trim())
-    if (!Number.isFinite(value) || value <= 0) {
-      toast.error('Introduce un ID de producto valido')
-      return
+      // Establecer dimensiones del QR (asumiendo QR cuadrado)
+      const qrSize = 300 // Tamaño fijo para QR
+      updateDesignMetadata(placement, qrSize, qrSize)
+      
+      // Marcar el QR como colocado en esta área
+      setDesignsByPlacement((prev) => ({ ...prev, [placement]: data.url }))
+      setQrPlacement(placement)
+      setQrPlaced(true)
+      
+      // Limpiar mockups existentes para regenerar con QR
+      if (selectedVariantId) {
+        setVariantMockups((current) => {
+          if (!current[selectedVariantId]) return current
+          const next = { ...current, [selectedVariantId]: { ...current[selectedVariantId] } }
+          delete next[selectedVariantId][placement]
+          return next
+        })
+      }
+      
+      toast.success('QR colocado correctamente')
+    } catch (error) {
+      console.error('[qr-placement] error:', error)
+      toast.error('No pudimos colocar el QR. Intenta de nuevo.')
+    } finally {
+      setUploading(false)
     }
-    handleProductChange(value)
   }
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -924,7 +1603,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       .filter((entry): entry is {
         placement: string
         imageUrl: string
-        printfileId?: number
+        printfileId: number | undefined
         position: { top: number; left: number; width: number; height: number; areaWidth: number; areaHeight: number }
       } => Boolean(entry))
   }
@@ -932,7 +1611,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     if (attempt > MAX_POLL_ATTEMPTS) {
       setGeneratingMockup(false)
       activeTaskRef.current = null
-      toast.error('Printful tardeee demasiado. Intenta de nuevo en unos minutos.')
+      toast.error('El proceso tardeee demasiado. Intenta de nuevo en unos minutos.')
       return
     }
 
@@ -993,16 +1672,16 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
         })
         setGeneratingMockup(false)
         activeTaskRef.current = null
-        setStatusMessage(data.message || 'Mockup generado con eeexito en Printful')
-        toast.success('Mockup generado con eeexito en Printful')
+        setStatusMessage(data.message || 'Mockup generado con eeexito')
+        toast.success('Mockup generado con eeexito')
         return
       }
 
       if (data.status === 'failed') {
         setGeneratingMockup(false)
         activeTaskRef.current = null
-        setStatusMessage(data.message || 'Printful no pudo generar el mockup')
-        toast.error('Printful no pudo generar el mockup. Revisa los archivos y vuelve a intentarlo.')
+        setStatusMessage(data.message || 'No se pudo generar el mockup')
+        toast.error('No se pudo generar el mockup. Revisa los archivos y vuelve a intentarlo.')
         return
       }
 
@@ -1011,7 +1690,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       console.error('Error polling Printful mockup', error)
       setGeneratingMockup(false)
       activeTaskRef.current = null
-      toast.error('Error al consultar el estado del mockup en Printful')
+      toast.error('Error al consultar el estado del mockup')
     }
   }
 
@@ -1039,7 +1718,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
       const data = await response.json()
       if (!response.ok || !data.success || !data.requestId) {
-        throw new Error(data.error || 'Printful no acepto la tarea de mockup')
+        throw new Error(data.error || 'No se aceptó la tarea de mockup')
       }
 
       activeTaskRef.current = { key: data.requestId, variantId: selectedVariantId }
@@ -1048,13 +1727,20 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       console.error('Error generating mockup in Printful', error)
       setGeneratingMockup(false)
       activeTaskRef.current = null
-      toast.error(error instanceof Error ? error.message : 'No pudimos pedir el mockup a Printful')
+      toast.error(error instanceof Error ? error.message : 'No pudimos solicitar el mockup')
     }
   }
   const handleSave = () => {
     if (!productData) return
-    if (!hasAnyDesign) {
-      toast.error('Agrega al menos un diseeeeo antes de guardar')
+    if (!qrPlaced) {
+      toast.error('Debes colocar el QR antes de guardar el diseño')
+      return
+    }
+    
+    // Verificar que hay al menos un diseño (puede ser solo QR)
+    const hasDesigns = Object.values(designsByPlacement).some(Boolean)
+    if (!hasDesigns) {
+      toast.error('No hay diseños para guardar')
       return
     }
 
@@ -1095,7 +1781,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     }
 
     onSave(payload)
-    toast.success('Diseeeeo guardado con Printful')
+    toast.success('Diseeeeo guardado')
   }
 
   return (
@@ -1116,69 +1802,15 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
         <div className="grid gap-6 p-6 md:grid-cols-[1.2fr_1fr]">
           <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4">
-              <label className="block text-xs font-semibold text-gray-500">Producto Printful</label>
-              <div className="mt-2 space-y-2">
-                {showCatalogLoading && (
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-                    <span>Conectando con el catalogo real de Printful...</span>
-                  </div>
-                )}
-                <input
-                  value={catalogSearchTerm}
-                  onChange={handleCatalogSearchChange}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Buscar por nombre, marca o ID"
-                />
-                <select
-                  value={selectedProductId ? String(selectedProductId) : ''}
-                  onChange={handleCatalogProductChange}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Selecciona un producto</option>
-                  {catalogOptions.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {formatCatalogOptionLabel(product)}
-                    </option>
-                  ))}
-                </select>
-                {showNoCatalogResultsHint && (
-                  <p className="text-xs text-gray-500">
-                    No encontramos productos para &ldquo;{catalogSearchTerm}&rdquo;. Mostramos los {catalogProducts.length} disponibles.
-                  </p>
-                )}
-                {catalogError && (
-                  <p className="text-xs text-orange-600">{catalogError}</p>
-                )}
-              </div>
-              <form onSubmit={handleManualProductSubmit} className="mt-2 flex gap-2">
-                <input
-                  value={manualProductCode}
-                  onChange={handleManualProductInput}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="ID de producto (ej. 71)"
-                />
-                <button
-                  type="submit"
-                  className="rounded-lg border border-primary-200 px-3 py-2 text-xs font-semibold text-primary-600 transition hover:border-primary-300 hover:text-primary-700"
-                >
-                  Cargar
-                </button>
-              </form>
-              <p className="mt-1 text-[11px] text-gray-500">Si conoces el ID exacto, introducelo arriba y pulsa cargar.</p>
-              {productData && (
-                <div className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
-                  <p className="font-semibold text-gray-900">{productData.name}</p>
-                  <p>
-                    {productData.brand ? `${productData.brand} ` : ''}
-                    {productData.model || productData.type || ''}
-                  </p>
-                </div>
-              )}
-            </div>
+            <CatalogSelector 
+              selectedId={selectedProductId} 
+              onSelect={handleProductChange} 
+              fallbackItem={fallbackCatalogItem}
+              confirmedProductId={confirmedProductId}
+              onConfirmProduct={setConfirmedProductId}
+            />
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">{productData?.name || 'Producto Printful'}</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{productData?.name || 'Producto'}</h2>
               <p className="text-sm text-gray-600">
                 QR <span className="font-semibold text-gray-900">{qrCode}</span>
               </p>
@@ -1186,6 +1818,36 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
               {lastError && <p className="text-xs text-red-500">{lastError}</p>}
             </div>
 
+            {/* Imagen del producto seleccionado */}
+            {selectedItem && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                <h3 className="mb-3 text-sm font-semibold text-gray-900">Imagen del Producto</h3>
+                <div className="flex justify-center">
+                  {selectedItem.image ? (
+                    <img
+                      src={selectedItem.image}
+                      alt={selectedItem.name}
+                      className="max-h-64 w-auto rounded-lg object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+                      <ImageIcon className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 text-center text-xs text-gray-600">
+                  <p><strong>ID:</strong> {selectedItem.id}</p>
+                  <p><strong>Tipo:</strong> {selectedItem.type}</p>
+                  <p><strong>Marca:</strong> {selectedItem.brand}</p>
+                </div>
+              </div>
+            )}
+
+            {selectedItem && (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-600">
+                  Áreas de impresión disponibles ({placementList.length}):
+                </div>
             <div className="flex flex-wrap gap-2">
               {placementList.map((placement) => {
                 const isActive = activePlacement === placement.placement
@@ -1208,12 +1870,14 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                 )
               })}
             </div>
+              </div>
+            )}
 
             <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-gray-200 bg-gray-50">
               {loadingProduct ? (
                 <div className="flex flex-col items-center gap-3 text-sm text-gray-500">
                   <Loader2 className="h-7 w-7 animate-spin text-primary-500" />
-                  <span>Conectando con Printful...</span>
+                  <span>Conectando...</span>
                 </div>
               ) : lastError ? (
                 <div className="space-y-3 text-center text-sm text-red-500">
@@ -1249,12 +1913,13 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
               ) : (
                 <div className="text-center text-sm text-gray-500">
                   <ImageIcon className="mx-auto h-10 w-10 text-gray-300" />
-                  <p className="mt-2">Sube un diseeeeo para ver el mockup oficial de Printful.</p>
+                  <p className="mt-2">Sube un diseeeeo para ver el mockup oficial.</p>
                 </div>
               )}
             </div>
           </div>
 
+          {confirmedItem && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-4">
               <label className="block text-xs font-semibold text-gray-500">Talla</label>
@@ -1289,7 +1954,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
               {selectedVariant && (
                 <div className="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
                   <p>
-                    Variante Printful: <span className="font-semibold text-gray-900">{selectedVariant.id}</span>
+                    Variante: <span className="font-semibold text-gray-900">{selectedVariant.id}</span>
                   </p>
                   <p>
                     Seleccieeen: <span className="font-semibold text-gray-900">{selectedVariant.size}</span> /{' '}
@@ -1305,7 +1970,9 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
               </p>
               {designsByPlacement[activePlacement] ? (
                 <div className="mt-3 space-y-2 rounded-lg bg-green-50 p-3 text-xs text-green-700">
-                  <p className="font-semibold">Diseeeeo cargado</p>
+                  <p className="font-semibold">
+                    {qrPlacement === activePlacement ? 'QR colocado' : 'Diseeeeo cargado'}
+                  </p>
                   <div className="flex gap-2">
                     <button
                       onClick={requestMockup}
@@ -1323,20 +1990,52 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                   </div>
                 </div>
               ) : (
-                <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
-                  <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleImageUpload} disabled={uploading} />
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
-                      Subiendo diseeeeo...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-6 w-6 text-primary-400" />
-                      Click para subir imagen
-                    </>
+                <div className="mt-3 space-y-3">
+                  {/* Botón para colocar QR */}
+                  {!qrPlaced && (
+                    <button
+                      onClick={() => handleQrPlacement(activePlacement)}
+                      disabled={uploading}
+                      className="w-full rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 p-4 text-center text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                          Colocando QR...
+                        </>
+                      ) : (
+                        <>
+                          📱 Colocar QR aquí
+                        </>
+                      )}
+                    </button>
                   )}
-                </label>
+                  
+                  {/* Opción para subir imagen (solo si QR ya está colocado) */}
+                  {qrPlaced && (
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+                      <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                      {uploading ? (
+                        <>
+                          <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+                          Subiendo imagen...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-6 w-6 text-primary-400" />
+                          Click para subir imagen adicional
+                        </>
+                      )}
+                    </label>
+                  )}
+                  
+                  {/* Mensaje informativo */}
+                  {!qrPlaced && (
+                    <p className="text-xs text-gray-500 text-center">
+                      Primero coloca el QR, después puedes agregar imágenes
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1357,7 +2056,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                 disabled={!hasAnyDesign || generatingMockup || uploading}
                 className="rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Guardar diseeeeo con Printful
+                Guardar diseeeeo
               </button>
               <button
                 onClick={onClose}
@@ -1367,11 +2066,15 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
+
+
+
 
 
 

@@ -125,6 +125,24 @@ class PrintfulAPI {
     })
     return response.result
   }
+
+  // Obtener todos los productos del catálogo con paginación
+  async getCatalogProducts(limit: number = 100, offset: number = 0): Promise<any> {
+    const response = await this.request(`/products?limit=${limit}&offset=${offset}`)
+    return response
+  }
+
+  // Obtener un producto específico por ID
+  async getProductById(productId: number): Promise<any> {
+    const response = await this.request(`/products/${productId}`)
+    return response.result
+  }
+
+  // Obtener todas las variantes de un producto específico
+  async getProductVariantsById(productId: number): Promise<any> {
+    const response = await this.request(`/products/${productId}/variants`)
+    return response.result
+  }
 }
 
 // Función helper para mapear datos de nuestro sistema a Printful

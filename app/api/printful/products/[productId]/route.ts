@@ -81,7 +81,18 @@ function resolveProductId(identifier: string): number | null {
 
 function buildPlacements(files: any[] | undefined, printfilesData?: any): PlacementEntry[] {
   const resultMap = new Map<string, PlacementEntry>()
+  
+  // Solo usar FALLBACK_PLACEMENTS si no hay datos específicos del producto
+  const hasSpecificPlacements = Array.isArray(files) && files.length > 0
+  const hasPrintfilesPlacements = printfilesData && printfilesData.variant_printfiles && 
+    Array.isArray(printfilesData.variant_printfiles) && 
+    printfilesData.variant_printfiles[0]?.placements &&
+    Object.keys(printfilesData.variant_printfiles[0].placements).length > 0
+  
+  if (!hasSpecificPlacements && !hasPrintfilesPlacements) {
+    // Solo usar fallbacks si no hay áreas específicas del producto
   FALLBACK_PLACEMENTS.forEach((entry) => resultMap.set(entry.placement, { ...entry }))
+  }
 
   if (Array.isArray(files)) {
     files.forEach((file) => {
@@ -214,11 +225,11 @@ export async function GET(request: NextRequest, context: { params: { productId: 
 
     const variants = normalizeVariants(productPayload?.variants)
     const colors = normalizeColors(variants)
-    const sizes = [...new Set(variants.map((variant) => variant.size).filter(Boolean))]
+    const sizes = Array.from(new Set(variants.map((variant) => variant.size).filter(Boolean)))
 
     let printfilesData: any = null
     try {
-      const response = await client.getPrintfiles(productId)
+      const response: any = await client.getPrintfiles(productId)
       printfilesData = response?.result || response
     } catch (error) {
       console.warn('[printful products] printfiles unavailable', error)

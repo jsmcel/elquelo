@@ -7,6 +7,11 @@ export async function POST(request: NextRequest) {
   try {
     const { code, designData } = await request.json()
     
+    console.log('=== DESIGN SAVE DEBUG ===')
+    console.log('Code:', code)
+    console.log('DesignData keys:', Object.keys(designData || {}))
+    console.log('ProductOptions:', designData?.productOptions)
+    
     if (!code || !designData) {
       return NextResponse.json(
         { success: false, error: 'Código y datos de diseño requeridos' },
@@ -37,22 +42,36 @@ export async function POST(request: NextRequest) {
 
     const timestamp = new Date().toISOString()
 
+    const upsertData = {
+      qr_code: code,
+      design_data: designDataToStore,
+      product_size: designData.productOptions?.size || null,
+      product_color: designData.productOptions?.color || null,
+      product_gender: designData.productOptions?.gender || null,
+      created_at: timestamp,
+    }
+
+    console.log('Upsert data:', JSON.stringify(upsertData, null, 2))
+
     const { data, error } = await supabase
       .from('qr_designs')
-      .upsert({
-        qr_code: code,
-        design_data: designDataToStore,
-        product_size: designData.productOptions?.size || null,
-        product_color: designData.productOptions?.color || null,
-        product_gender: designData.productOptions?.gender || null,
-        created_at: timestamp,
-      }, { onConflict: 'qr_code' })
+      .upsert(upsertData, { onConflict: 'qr_code' })
       .select()
 
     if (error) {
-      console.error('Error saving design:', error)
+      console.error('Supabase error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
       return NextResponse.json(
-        { success: false, error: 'Error al guardar el diseño' },
+        { 
+          success: false, 
+          error: 'Error al guardar el diseño',
+          details: error.message,
+          code: error.code
+        },
         { status: 500 }
       )
     }

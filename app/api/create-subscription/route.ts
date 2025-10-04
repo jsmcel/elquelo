@@ -27,9 +27,19 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    const latestInvoice = subscription.latest_invoice
+    let clientSecret: string | null = null
+
+    if (latestInvoice && typeof latestInvoice !== 'string') {
+      const paymentIntent = latestInvoice.payment_intent
+      if (paymentIntent && typeof paymentIntent !== 'string') {
+        clientSecret = paymentIntent.client_secret ?? null
+      }
+    }
+
     return NextResponse.json({
       subscriptionId: subscription.id,
-      clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+      clientSecret,
     })
   } catch (error) {
     console.error('Error creating subscription:', error)

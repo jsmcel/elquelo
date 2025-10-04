@@ -331,7 +331,8 @@ export function QRGenerator() {
       const entries = await Promise.all(
         qrs.map(async (qr) => {
           try {
-            const dataUrl = await QRCode.toDataURL(qr.qr_url, { width: 220, margin: 1 })
+            const { generateStandardQR } = await import('@/lib/qr-generator')
+            const dataUrl = await generateStandardQR(qr.qr_url)
             return { code: qr.code, dataUrl }
           } catch (error) {
             console.error('Error generating QR', error)
@@ -622,6 +623,11 @@ export function QRGenerator() {
         clonedDesign.copiedAt = new Date().toISOString()
         clonedDesign.targetQRCode = targetQR.code
         clonedDesign.targetQRUrl = targetQR.destination_url
+        
+        // Regenerar archivos de QR para el nuevo QR
+        console.log(`Regenerando QR files para ${targetQR.code}...`)
+        await regenerateQRFiles(clonedDesign, sourceDesign.code, targetQR.code, qrs)
+        
         if (clonedDesign.printful) {
           clonedDesign.printful = {
             ...clonedDesign.printful,
@@ -641,7 +647,7 @@ export function QRGenerator() {
 
       const copiedCodes = await Promise.all(copyPromises)
 
-      toast.success(`Diseno copiado a ${copiedCodes.length} QR(s)`)
+      toast.success(`Diseno copiado a ${copiedCodes.length} QR(s). QRs regenerados correctamente.`)
       setCopyDesignOpen(false)
       setSourceDesign(null)
       setSelectedTargetQRs([])
@@ -651,6 +657,74 @@ export function QRGenerator() {
       toast.error('Error al copiar el diseno')
     } finally {
       setCopyingDesign(false)
+    }
+  }
+
+  const regenerateQRFiles = async (clonedDesign: any, sourceQRCode: string, targetQRCode: string, availableQRs: QRRow[]) => {
+    try {
+      // Buscar archivos de QR en el diseño clonado
+      const placements = clonedDesign.designsByPlacement || clonedDesign.printful?.placements || {}
+      
+      for (const [placement, value] of Object.entries(placements)) {
+        let imageUrl: string | null = null
+        
+        if (typeof value === 'string') {
+          imageUrl = value
+        } else if (value && typeof value === 'object' && 'imageUrl' in value) {
+          imageUrl = (value as any).imageUrl
+        }
+        
+        // Si es un archivo de QR (contiene '-qr.png' o 'qr' en la URL)
+        if (imageUrl && (imageUrl.includes('-qr.png') || imageUrl.includes('qr'))) {
+          console.log(`Regenerando QR para placement ${placement}: ${sourceQRCode} -> ${targetQRCode}`)
+          
+          // Generar nueva imagen QR para el target QR (usar URL corta como el QR original)
+          const targetQR = availableQRs.find(qr => qr.code === targetQRCode)
+          const targetQRUrl = targetQR ? `http://lql.to/${targetQR.code}` : targetQRCode
+          
+          const { generateStandardQR } = await import('@/lib/qr-generator')
+          const qrDataUrl = await generateStandardQR(targetQRUrl)
+          
+          // Convertir a archivo
+          const qrResponse = await fetch(qrDataUrl)
+          const blob = await qrResponse.blob()
+          const qrFile = new File([blob], `qr-${targetQRCode}.png`, { type: 'image/png' })
+          
+          // Subir nuevo QR
+          const formData = new FormData()
+          formData.append('file', qrFile)
+          formData.append('code', `${targetQRCode}-${placement}`)
+          formData.append('placement', placement)
+          
+          const uploadResponse = await fetch('/api/design/upload-qr', {
+            method: 'POST',
+            body: formData,
+          })
+          
+          const uploadData = await uploadResponse.json()
+          if (!uploadResponse.ok || !uploadData.success) {
+            console.error('Error regenerating QR:', uploadData.error)
+            continue
+          }
+          
+          // Actualizar la URL en el diseño clonado
+          if (typeof value === 'string') {
+            clonedDesign.designsByPlacement[placement] = uploadData.url
+          } else if (value && typeof value === 'object') {
+            (value as any).imageUrl = uploadData.url
+          }
+          
+          // CRÍTICO: También actualizar en printful.placements si existe
+          if (clonedDesign.printful?.placements?.[placement]) {
+            clonedDesign.printful.placements[placement].imageUrl = uploadData.url
+          }
+          
+          console.log(`QR regenerado para ${placement}: ${uploadData.url}`)
+        }
+      }
+    } catch (error) {
+      console.error('Error regenerating QR files:', error)
+      // No lanzar error para no interrumpir la copia completa
     }
   }
 
@@ -676,7 +750,13 @@ export function QRGenerator() {
       })
 
       const data = await uploadResponse.json()
+      console.log('=== CLIENT SIDE DEBUG ===')
+      console.log('Response status:', uploadResponse.status)
+      console.log('Response ok:', uploadResponse.ok)
+      console.log('Response data:', data)
+      
       if (!uploadResponse.ok || !data.success) {
+        console.error('Save failed:', { status: uploadResponse.status, data })
         throw new Error(data.error || 'Error al guardar el diseno')
       }
 
@@ -1054,7 +1134,7 @@ export function QRGenerator() {
                             <ImageIcon className="h-6 w-6 text-primary-500" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">Mockups Printful</p>
+                            <p className="text-sm font-semibold text-gray-900">Mockups</p>
                             <p className="text-xs text-gray-500">Gestiona las creatividades y genera mockups oficiales.</p>
                           </div>
                         </div>
@@ -1063,7 +1143,7 @@ export function QRGenerator() {
                           className="inline-flex items-center gap-2 rounded-full border border-gray-200/60 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600"
                         >
                           <UploadCloud className="h-4 w-4" />
-                          {designState?.loading ? 'Preparando editor...' : 'Editar con Printful'}
+                          {designState?.loading ? 'Preparando editor...' : 'Editar diseño'}
                         </button>
                       </div>
                       <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200/40 bg-white">
@@ -1089,7 +1169,7 @@ export function QRGenerator() {
                                     </div>
                                   )}
                                   <div>
-                                    <p className="font-semibold text-gray-900">Diseno Printful guardado</p>
+                                    <p className="font-semibold text-gray-900">Diseño guardado</p>
                                     <p className="text-xs text-gray-500">
                                       Variante {designState.printfulSummary?.variantId ?? 'N/A'} -{' '}
                                       {designState.printfulSummary?.size ?? 'Sin talla'} -{' '}
@@ -1140,7 +1220,7 @@ export function QRGenerator() {
                                 onClick={() => uploadDesign(qr.code)}
                                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-primary-200 hover:text-primary-600"
                               >
-                                <UploadCloud className="h-3.5 w-3.5" /> Editar con Printful
+                                <UploadCloud className="h-3.5 w-3.5" /> Editar diseño
                               </button>
                             </div>
                           </div>
@@ -1158,7 +1238,7 @@ export function QRGenerator() {
                           </div>
                         ) : (
                           <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                            No hay diseno todavia. Genera un mockup con Printful.
+                            No hay diseño todavía. Genera un mockup.
                           </div>
                         )}
                       </div>
@@ -1174,7 +1254,7 @@ export function QRGenerator() {
       {/* Editor Printful */}
       {editorOpen && editingQR && (
         <PrintfulDesignEditor
-          qrCode={editingQR.code}
+          qrCode={`http://lql.to/${editingQR.code}`}
           onClose={() => {
             setEditorOpen(false)
             setEditingQR(null)
@@ -1190,7 +1270,7 @@ export function QRGenerator() {
           <div className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
-                Mockups Printful - {viewingDesign.code}
+                Mockups - {viewingDesign.code}
               </h3>
               <button
                 onClick={() => {
@@ -1206,7 +1286,7 @@ export function QRGenerator() {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="rounded-lg bg-gray-50 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900">Variante Printful</h4>
+                    <h4 className="text-sm font-semibold text-gray-900">Variante</h4>
                     <div className="mt-2 space-y-1 text-sm text-gray-600">
                       <p>ID variante: {viewingSummary?.variantId ?? 'N/D'}</p>
                       <p>Talla: {viewingSummary?.size ?? 'Sin talla'}</p>
@@ -1216,7 +1296,7 @@ export function QRGenerator() {
                   <div className="rounded-lg bg-gray-50 p-4">
                     <h4 className="text-sm font-semibold text-gray-900">Detalles del guardado</h4>
                     <div className="mt-2 space-y-1 text-sm text-gray-600">
-                      <p>Producto: {viewingDesign.designData?.printfulProduct?.name || 'Printful'}</p>
+                      <p>Producto: {viewingDesign.designData?.printfulProduct?.name || 'Producto'}</p>
                       <p>Guardado: {new Date(viewingDesign.designData?.savedAt || viewingDesign.designData?.createdAt || Date.now()).toLocaleString()}</p>
                       <p>QR destino: {viewingDesign.code}</p>
                     </div>
@@ -1252,7 +1332,7 @@ export function QRGenerator() {
                   </div>
                 ) : (
                   <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
-                    No encontramos mockups para este diseno. Genera nuevos mockups desde el editor de Printful.
+                    No encontramos mockups para este diseño. Genera nuevos mockups desde el editor.
                   </div>
                 )}
 
