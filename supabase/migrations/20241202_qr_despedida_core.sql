@@ -336,6 +336,12 @@ ALTER TABLE public.event_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_actions_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.qr_destination_metrics_daily ENABLE ROW LEVEL SECURITY;
 
+-- Ensure base privileges so policies can reference tables
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT ON public.event_members TO anon, authenticated;
+GRANT SELECT ON public.group_members TO anon, authenticated;
+GRANT SELECT ON public.events TO anon, authenticated;
+
 -- Update existing policies for qrs and scans to include event membership
 DROP POLICY IF EXISTS "Users can view own QRs" ON public.qrs;
 CREATE POLICY "Users and event members can view QRs" ON public.qrs
