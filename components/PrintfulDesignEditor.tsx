@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -7,7 +7,10 @@ import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide
 import { toast } from 'react-hot-toast'
 
 interface PrintfulDesignEditorProps {
+  // Short QR code identifier (e.g., ABC123) used for filenames/DB
   qrCode: string
+  // Canonical QR content to encode (e.g., lql.to/ABC123), must match dashboard
+  qrContent: string
   onSave: (designData: any) => void
   onClose: () => void
   savedDesignData?: any
@@ -593,7 +596,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
   const [country, setCountry] = useState<string | null>(null)
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
   
-  // Estados para controlar el flujo de selección
+  // Estados para controlar el flujo de selecciÃ³n
   const [tentativeSelection, setTentativeSelection] = useState<number | null>(null)
   const [confirmedSelection, setConfirmedSelection] = useState<number | null>(selectedId)
 
@@ -654,7 +657,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
       const data = await response.json()
 
       if (!response.ok || data?.success === false) {
-        throw new Error(data?.error || 'No pudimos obtener el catálogo')
+        throw new Error(data?.error || 'No pudimos obtener el catÃ¡logo')
       }
 
       const normalizedItems = normalizeCatalogItems(Array.isArray(data?.items) ? data.items : data?.products)
@@ -692,7 +695,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
       const message =
         fetchError instanceof Error && fetchError.name !== 'AbortError'
           ? fetchError.message
-          : 'No pudimos obtener el catálogo'
+          : 'No pudimos obtener el catÃ¡logo'
       setError(message)
       toast.error(message)
     } finally {
@@ -733,7 +736,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
   }, [items, normalizedType, searchTerm])
 
   const confirmedItem = useMemo(() => {
-    // Para opciones de personalización, solo usar confirmedSelection
+    // Para opciones de personalizaciÃ³n, solo usar confirmedSelection
     const targetId = confirmedSelection || selectedId
     if (!targetId) {
       return null
@@ -801,7 +804,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
         return
       }
       
-      // Confirmar la selección final
+      // Confirmar la selecciÃ³n final
       setConfirmedSelection(tentativeSelection)
       setTentativeSelection(null)
       
@@ -908,7 +911,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
             </p>
           </div>
 
-          {/* Botón de confirmación */}
+          {/* BotÃ³n de confirmaciÃ³n */}
           {tentativeSelection && !confirmedSelection && (
             <div className="text-center">
             <button
@@ -917,12 +920,12 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
                 className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
             >
                 <Check className="mr-2 h-4 w-4" />
-                Confirmar Selección
+                Confirmar SelecciÃ³n
             </button>
             </div>
           )}
 
-          {/* Botón para cambiar producto */}
+          {/* BotÃ³n para cambiar producto */}
           {confirmedSelection && (
             <div className="text-center">
               <button
@@ -960,7 +963,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
       {loading && items.length === 0 && (
         <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
               <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-          Cargando catálogo...
+          Cargando catÃ¡logo...
             </div>
       )}
 
@@ -975,7 +978,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
 
 
 
-export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData }: PrintfulDesignEditorProps) {
+export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, savedDesignData }: PrintfulDesignEditorProps) {
   const [selectedProductId, setSelectedProductId] = useState<number>(() => {
     const candidate = Number(savedDesignData?.printfulProduct?.productId || savedDesignData?.productId)
     if (Number.isFinite(candidate) && candidate > 0) {
@@ -994,7 +997,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   const [selectedColorCode, setSelectedColorCode] = useState('')
   const [activePlacement, setActivePlacement] = useState('front')
   const [uploading, setUploading] = useState(false)
-  const [qrPlacement, setQrPlacement] = useState<string | null>(null) // Dónde está colocado el QR
+  const [qrPlacement, setQrPlacement] = useState<string | null>(null) // DÃ³nde estÃ¡ colocado el QR
   const [qrPlaced, setQrPlaced] = useState(false) // Si el QR ya fue colocado
   const [generatingMockup, setGeneratingMockup] = useState(false)
   const [lastError, setLastError] = useState<string | null>(null)
@@ -1065,7 +1068,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   }, [productData, selectedVariantId])
 
   const confirmedItem = useMemo(() => {
-    // Para opciones de personalización, solo usar confirmedProductId
+    // Para opciones de personalizaciÃ³n, solo usar confirmedProductId
     const targetId = confirmedProductId || selectedProductId
     if (!targetId) {
       return null
@@ -1181,7 +1184,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   )
 
   useEffect(() => {
-    // Cargar el producto cuando se selecciona (para mostrar áreas de impresión)
+    // Cargar el producto cuando se selecciona (para mostrar Ã¡reas de impresiÃ³n)
     if (!selectedProductId) {
       return
     }
@@ -1443,15 +1446,15 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     
     setUploading(true)
     try {
-      // DEBUG: Verificar qué está recibiendo el componente
+      // DEBUG: Verificar quÃ© estÃ¡ recibiendo el componente
       console.log('=== QR PLACEMENT DEBUG ===')
       console.log('qrCode prop recibido:', qrCode)
       console.log('qrCode type:', typeof qrCode)
       console.log('qrCode length:', qrCode?.length)
       
-      // Generar imagen QR desde el código usando función estándar
+      // Generar imagen QR desde el cÃ³digo usando funciÃ³n estÃ¡ndar
       const { generateStandardQR } = await import('@/lib/qr-generator')
-      const qrDataUrl = await generateStandardQR(qrCode)
+      const qrDataUrl = await generateStandardQR(qrContent)
       
       // Convertir data URL a Blob y luego a File
       const qrResponse = await fetch(qrDataUrl)
@@ -1475,10 +1478,10 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
       }
 
       // Establecer dimensiones del QR (asumiendo QR cuadrado)
-      const qrSize = 300 // Tamaño fijo para QR
+      const qrSize = 300 // TamaÃ±o fijo para QR
       updateDesignMetadata(placement, qrSize, qrSize)
       
-      // Marcar el QR como colocado en esta área
+      // Marcar el QR como colocado en esta Ã¡rea
       setDesignsByPlacement((prev) => ({ ...prev, [placement]: data.url }))
       setQrPlacement(placement)
       setQrPlaced(true)
@@ -1718,7 +1721,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
 
       const data = await response.json()
       if (!response.ok || !data.success || !data.requestId) {
-        throw new Error(data.error || 'No se aceptó la tarea de mockup')
+        throw new Error(data.error || 'No se aceptÃ³ la tarea de mockup')
       }
 
       activeTaskRef.current = { key: data.requestId, variantId: selectedVariantId }
@@ -1733,14 +1736,14 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
   const handleSave = () => {
     if (!productData) return
     if (!qrPlaced) {
-      toast.error('Debes colocar el QR antes de guardar el diseño')
+      toast.error('Debes colocar el QR antes de guardar el diseÃ±o')
       return
     }
     
-    // Verificar que hay al menos un diseño (puede ser solo QR)
+    // Verificar que hay al menos un diseÃ±o (puede ser solo QR)
     const hasDesigns = Object.values(designsByPlacement).some(Boolean)
     if (!hasDesigns) {
-      toast.error('No hay diseños para guardar')
+      toast.error('No hay diseÃ±os para guardar')
       return
     }
 
@@ -1846,7 +1849,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
             {selectedItem && (
               <div className="space-y-2">
                 <div className="text-xs text-gray-600">
-                  Áreas de impresión disponibles ({placementList.length}):
+                  Ãreas de impresiÃ³n disponibles ({placementList.length}):
                 </div>
             <div className="flex flex-wrap gap-2">
               {placementList.map((placement) => {
@@ -1991,7 +1994,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">
-                  {/* Botón para colocar QR */}
+                  {/* BotÃ³n para colocar QR */}
                   {!qrPlaced && (
                     <button
                       onClick={() => handleQrPlacement(activePlacement)}
@@ -2005,13 +2008,13 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                         </>
                       ) : (
                         <>
-                          📱 Colocar QR aquí
+                          ðŸ“± Colocar QR aquÃ­
                         </>
                       )}
                     </button>
                   )}
                   
-                  {/* Opción para subir imagen (solo si QR ya está colocado) */}
+                  {/* OpciÃ³n para subir imagen (solo si QR ya estÃ¡ colocado) */}
                   {qrPlaced && (
                     <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
                       <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleImageUpload} disabled={uploading} />
@@ -2032,7 +2035,7 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
                   {/* Mensaje informativo */}
                   {!qrPlaced && (
                     <p className="text-xs text-gray-500 text-center">
-                      Primero coloca el QR, después puedes agregar imágenes
+                      Primero coloca el QR, despuÃ©s puedes agregar imÃ¡genes
                     </p>
                   )}
                 </div>
@@ -2072,7 +2075,6 @@ export function PrintfulDesignEditor({ qrCode, onSave, onClose, savedDesignData 
     </div>
   )
 }
-
 
 
 

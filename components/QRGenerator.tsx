@@ -680,7 +680,7 @@ export function QRGenerator() {
           
           // Generar nueva imagen QR para el target QR (usar URL corta como el QR original)
           const targetQR = availableQRs.find(qr => qr.code === targetQRCode)
-          const targetQRUrl = targetQR ? `http://lql.to/${targetQR.code}` : targetQRCode
+          const targetQRUrl = targetQR ? targetQR.qr_url : targetQRCode
           
           const { generateStandardQR } = await import('@/lib/qr-generator')
           const qrDataUrl = await generateStandardQR(targetQRUrl)
@@ -1254,7 +1254,10 @@ export function QRGenerator() {
       {/* Editor Printful */}
       {editorOpen && editingQR && (
         <PrintfulDesignEditor
-          qrCode={`http://lql.to/${editingQR.code}`}
+          // Use short code for filenames/metadatos
+          qrCode={editingQR.code}
+          // Use canonical content (same as dashboard) for QR encoding
+          qrContent={editingQR.qr_url}
           onClose={() => {
             setEditorOpen(false)
             setEditingQR(null)
@@ -1511,4 +1514,3 @@ export function QRGenerator() {
     </div>
   )
 }
-
