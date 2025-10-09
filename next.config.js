@@ -3,10 +3,9 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'cdn.shopify.com', 'printful-upload.s3-accelerate.amazonaws.com'],
   },
-  // Disable output file tracing to prevent micromatch stack overflow
-  output: 'standalone',
+  // Exclude problematic directories from file tracing (requires Next.js 14.1+)
   experimental: {
-    outputFileTracingRoot: undefined,
+    outputFileTracingIgnores: ['apps/mobile/**', 'supabase/**', 'scripts/**', 'mocks/**', 'docs/**', '**/*.sql', '**/*.zip'],
   },
   // Exclude mobile app and supabase functions from Next.js build
   webpack: (config, { isServer }) => {
