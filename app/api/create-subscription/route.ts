@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     let clientSecret: string | null = null
 
     if (latestInvoice && typeof latestInvoice !== 'string') {
-      const paymentIntent = latestInvoice.payment_intent
+      const paymentIntent = (latestInvoice as any).payment_intent
       if (paymentIntent && typeof paymentIntent !== 'string') {
         clientSecret = paymentIntent.client_secret ?? null
       }
