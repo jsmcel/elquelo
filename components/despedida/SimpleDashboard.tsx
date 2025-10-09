@@ -163,7 +163,7 @@ function OverviewPanel({ eventId, event, onOpenQuickStart }: any) {
 
       {/* CARD: Álbum */}
       <ActionCard
-        icon={<Image className="h-8 w-8" alt="" />}
+        icon={<Image className="h-8 w-8" />}
         title="Álbum de Fotos"
         description={`${event.album?.length || 0} fotos`}
         color="purple"
@@ -580,7 +580,7 @@ function QRSchedulerWrapper({ qrId, eventId, event, onUpdate }: any) {
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                  <Image className="h-5 w-5 text-purple-600" alt="" />
+                  <Image className="h-5 w-5 text-purple-600" />
                 </div>
                 <span className="font-bold text-gray-900">Álbum</span>
               </div>
@@ -740,7 +740,7 @@ function ContentPanel({ eventId, event }: any) {
               <NextImage src={photo.url} alt={photo.caption || 'Foto del álbum'} className="w-full h-full object-cover" width={400} height={400} />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Image className="h-12 w-12 text-purple-300" alt="" />
+                <Image className="h-12 w-12 text-purple-300" />
               </div>
             )}
           </div>
