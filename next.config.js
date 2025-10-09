@@ -5,7 +5,9 @@ const nextConfig = {
   },
   // Exclude problematic directories from file tracing (requires Next.js 14.1+)
   experimental: {
-    outputFileTracingIgnores: ['apps/mobile/**', 'supabase/**', 'scripts/**', 'mocks/**', 'docs/**', '**/*.sql', '**/*.zip'],
+    outputFileTracingExcludes: {
+      '*': ['apps/mobile/**', 'supabase/**', 'scripts/**', 'mocks/**', 'docs/**', '**/*.sql', '**/*.zip'],
+    },
   },
   // Exclude mobile app and supabase functions from Next.js build
   webpack: (config, { isServer }) => {
