@@ -17,6 +17,8 @@ const nextConfig = {
   // Exclude specific directories from being processed
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'].map(ext => `page.${ext}`).concat(['tsx', 'ts', 'jsx', 'js']),
   transpilePackages: [],
+  // Exclude problematic directories from file tracing
+  outputFileTracingIgnores: ['apps/mobile/**', 'supabase/**', 'scripts/**', 'mocks/**', 'docs/**', '**/*.sql', '**/*.zip', 'stripe_*/**'],
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
