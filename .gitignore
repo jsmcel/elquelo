@@ -44,3 +44,8 @@ next-env.d.ts
 
 # OS
 Thumbs.db
+
+# Stripe CLI
+stripe_*_windows_*
+stripe_*_linux_*
+stripe_*_darwin_*
