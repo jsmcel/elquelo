@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+﻿import { randomBytes } from 'crypto'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 
 export async function ensureUserProfile(
@@ -47,7 +47,7 @@ export function buildDefaultDestination(): string {
 
 export function getAppBaseUrl(): string {
   const raw =
-    process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://elquelo.com'
+    process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://elquelo.eu'
   return raw.replace(/\/+$/, '')
 }
 

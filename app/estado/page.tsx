@@ -15,7 +15,7 @@ const estadoPlans = [
       'Cambios ilimitados',
       'Estadísticas básicas',
       'Soporte por email',
-      'Dominio personalizado lql.to'
+      'Dominio principal elquelo.eu'
     ],
     popular: false
   },

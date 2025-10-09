@@ -30,7 +30,7 @@ interface Participant {
 const BASE_PRICE = 29
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 const STEPS = ['Despedida', 'Integrantes', 'Crear Grupo']
-const FALLBACK_QR_URL = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.com'}/bienvenida`
+const FALLBACK_QR_URL = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu'}/bienvenida`
 
 const createParticipant = (): Participant => ({
   id: crypto.randomUUID(),
@@ -238,12 +238,12 @@ export default function ConfiguratorPage() {
         if (selectedQR) {
           setQrData({ 
             code: selectedQR.code, 
-            url: selectedQR.qr_url || `${process.env.QR_DOMAIN || 'https://elquelo.com'}/${selectedQR.code}` 
+            url: selectedQR.qr_url || `${process.env.QR_DOMAIN || 'https://elquelo.eu'}/${selectedQR.code}` 
           })
         } else {
           // Fallback si no hay QRs
           const tempQrCode = `temp_${Date.now()}`
-          const tempQrUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.com'}/${tempQrCode}`
+          const tempQrUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu'}/${tempQrCode}`
           setQrData({ code: tempQrCode, url: tempQrUrl })
           toast.error('No se encontraron QRs. Crea uno primero.')
         }
@@ -254,7 +254,7 @@ export default function ConfiguratorPage() {
       console.error('Error fetching user QRs:', error)
       // Fallback a QR temporal
       const tempQrCode = `temp_${Date.now()}`
-      const tempQrUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.com'}/${tempQrCode}`
+      const tempQrUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu'}/${tempQrCode}`
       setQrData({ code: tempQrCode, url: tempQrUrl })
       toast.error('No se pudieron cargar los QRs. Usando QR temporal.')
     }

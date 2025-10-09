@@ -65,10 +65,10 @@ async function checkQRUrls() {
     
     console.log('\n🎯 ANÁLISIS:')
     console.log(`   URL en BD: ${qr.destination_url}`)
-    console.log(`   URL corta que mencionas: http://lql.to/${qr.code}`)
+    console.log(`   URL corta que mencionas: https://elquelo.eu/qr/${qr.code}`)
     
     const isLongUrl = qr.destination_url.length > 50
-    const isShortUrl = qr.destination_url.includes('lql.to')
+    const isShortUrl = qr.destination_url.includes('elquelo.eu/qr')
     
     if (isLongUrl && !isShortUrl) {
       console.log('   ✅ La BD tiene la URL completa (correcto)')
@@ -82,7 +82,7 @@ async function checkQRUrls() {
     }
     
     console.log('\n💡 SOLUCIÓN:')
-    console.log('   Si el QR real apunta a lql.to/fda8fbe45796')
+    console.log('   Si el QR real apunta a elquelo.eu/qr/fda8fbe45796')
     console.log('   Entonces debemos usar esa URL en el PrintfulDesignEditor')
     console.log('   No la URL completa de destination_url')
     

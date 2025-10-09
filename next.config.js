@@ -1,4 +1,4 @@
-﻿/** @type {import('next').NextConfig} */
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'cdn.shopify.com', 'printful-upload.s3-accelerate.amazonaws.com'],
@@ -13,7 +13,7 @@ const nextConfig = {
     THIRDWEB_SECRET_KEY: process.env.THIRDWEB_SECRET_KEY,
     PRINTFUL_API_KEY: process.env.PRINTFUL_API_KEY,
     BREVO_API_KEY: process.env.BREVO_API_KEY,
-    QR_DOMAIN: process.env.QR_DOMAIN || 'lql.to',
+    QR_DOMAIN: process.env.QR_DOMAIN || 'https://elquelo.eu/qr',
   },
 }
 

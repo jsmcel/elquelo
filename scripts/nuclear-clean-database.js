@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js')
+﻿const { createClient } = require('@supabase/supabase-js')
 const fs = require('fs')
 const path = require('path')
 
@@ -39,97 +39,97 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function nuclearCleanDatabase() {
   try {
-    console.log('☢️  LIMPIEZA NUCLEAR DE TODA LA BASE DE DATOS...\n')
+    console.log('â˜¢ï¸  LIMPIEZA NUCLEAR DE TODA LA BASE DE DATOS...\n')
     
-    // 1. Eliminar TODOS los diseños
-    console.log('🗑️  Eliminando TODOS los diseños...')
+    // 1. Eliminar TODOS los diseÃ±os
+    console.log('ðŸ—‘ï¸  Eliminando TODOS los diseÃ±os...')
     const { error: deleteDesignsError } = await supabase
       .from('qr_designs')
       .delete()
-      .neq('qr_code', '')
+      .not('qr_code', 'is', null)
     
     if (deleteDesignsError) {
-      console.error('❌ Error eliminando diseños:', deleteDesignsError)
+      console.error('âŒ Error eliminando diseÃ±os:', deleteDesignsError)
     } else {
-      console.log('✅ Todos los diseños eliminados')
+      console.log('âœ… Todos los diseÃ±os eliminados')
     }
     
     // 2. Eliminar TODOS los QRs
-    console.log('🗑️  Eliminando TODOS los QRs...')
+    console.log('ðŸ—‘ï¸  Eliminando TODOS los QRs...')
     const { error: deleteQRError } = await supabase
       .from('qrs')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteQRError) {
-      console.error('❌ Error eliminando QRs:', deleteQRError)
+      console.error('âŒ Error eliminando QRs:', deleteQRError)
     } else {
-      console.log('✅ Todos los QRs eliminados')
+      console.log('âœ… Todos los QRs eliminados')
     }
     
     // 3. Eliminar TODOS los grupos
-    console.log('🗑️  Eliminando TODOS los grupos...')
+    console.log('ðŸ—‘ï¸  Eliminando TODOS los grupos...')
     const { error: deleteGroupsError } = await supabase
       .from('groups')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteGroupsError) {
-      console.error('❌ Error eliminando grupos:', deleteGroupsError)
+      console.error('âŒ Error eliminando grupos:', deleteGroupsError)
     } else {
-      console.log('✅ Todos los grupos eliminados')
+      console.log('âœ… Todos los grupos eliminados')
     }
     
     // 4. Eliminar TODOS los miembros de grupos
-    console.log('🗑️  Eliminando TODOS los miembros de grupos...')
+    console.log('ðŸ—‘ï¸  Eliminando TODOS los miembros de grupos...')
     const { error: deleteMembersError } = await supabase
       .from('group_members')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteMembersError) {
-      console.error('❌ Error eliminando miembros:', deleteMembersError)
+      console.error('âŒ Error eliminando miembros:', deleteMembersError)
     } else {
-      console.log('✅ Todos los miembros eliminados')
+      console.log('âœ… Todos los miembros eliminados')
     }
     
-    // 5. Eliminar TODAS las órdenes
-    console.log('🗑️  Eliminando TODAS las órdenes...')
+    // 5. Eliminar TODAS las Ã³rdenes
+    console.log('ðŸ—‘ï¸  Eliminando TODAS las Ã³rdenes...')
     const { error: deleteOrdersError } = await supabase
       .from('orders')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteOrdersError) {
-      console.error('❌ Error eliminando órdenes:', deleteOrdersError)
+      console.error('âŒ Error eliminando Ã³rdenes:', deleteOrdersError)
     } else {
-      console.log('✅ Todas las órdenes eliminadas')
+      console.log('âœ… Todas las Ã³rdenes eliminadas')
     }
     
     // 6. Eliminar TODOS los NFTs
-    console.log('🗑️  Eliminando TODOS los NFTs...')
+    console.log('ðŸ—‘ï¸  Eliminando TODOS los NFTs...')
     const { error: deleteNFTsError } = await supabase
       .from('nfts')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteNFTsError) {
-      console.error('❌ Error eliminando NFTs:', deleteNFTsError)
+      console.error('âŒ Error eliminando NFTs:', deleteNFTsError)
     } else {
-      console.log('✅ Todos los NFTs eliminados')
+      console.log('âœ… Todos los NFTs eliminados')
     }
     
     // 7. Limpiar TODOS los buckets de storage
-    console.log('🗑️  Limpiando TODOS los buckets de storage...')
+    console.log('ðŸ—‘ï¸  Limpiando TODOS los buckets de storage...')
     
     // Listar todos los buckets
     const { data: buckets, error: listBucketsError } = await supabase.storage.listBuckets()
     
     if (listBucketsError) {
-      console.error('❌ Error listando buckets:', listBucketsError)
+      console.error('âŒ Error listando buckets:', listBucketsError)
     } else {
       for (const bucket of buckets) {
-        console.log(`   🗑️  Limpiando bucket: ${bucket.name}`)
+        console.log(`   ðŸ—‘ï¸  Limpiando bucket: ${bucket.name}`)
         
         // Listar todos los archivos en el bucket
         const { data: files, error: listFilesError } = await supabase.storage
@@ -137,7 +137,7 @@ async function nuclearCleanDatabase() {
           .list('', { limit: 1000 })
         
         if (listFilesError) {
-          console.error(`   ❌ Error listando archivos en ${bucket.name}:`, listFilesError)
+          console.error(`   âŒ Error listando archivos en ${bucket.name}:`, listFilesError)
           continue
         }
         
@@ -149,25 +149,25 @@ async function nuclearCleanDatabase() {
             .remove(filePaths)
           
           if (deleteFilesError) {
-            console.error(`   ❌ Error eliminando archivos de ${bucket.name}:`, deleteFilesError)
+            console.error(`   âŒ Error eliminando archivos de ${bucket.name}:`, deleteFilesError)
           } else {
-            console.log(`   ✅ ${files.length} archivos eliminados de ${bucket.name}`)
+            console.log(`   âœ… ${files.length} archivos eliminados de ${bucket.name}`)
           }
         } else {
-          console.log(`   ✅ ${bucket.name} ya estaba vacío`)
+          console.log(`   âœ… ${bucket.name} ya estaba vacÃ­o`)
         }
       }
     }
     
     // 8. Verificar limpieza completa
-    console.log('\n🔍 Verificando limpieza nuclear...')
+    console.log('\nðŸ” Verificando limpieza nuclear...')
     
     const tablesToCheck = [
       { name: 'qr_designs', table: 'qr_designs' },
       { name: 'QRs', table: 'qrs' },
       { name: 'grupos', table: 'groups' },
       { name: 'miembros', table: 'group_members' },
-      { name: 'órdenes', table: 'orders' },
+      { name: 'Ã³rdenes', table: 'orders' },
       { name: 'NFTs', table: 'nfts' }
     ]
     
@@ -175,30 +175,30 @@ async function nuclearCleanDatabase() {
       try {
         const { data, error } = await supabase.from(table).select('*', { count: 'exact' })
         if (error) {
-          console.log(`❌ Error verificando ${name}: ${error.message}`)
+          console.log(`âŒ Error verificando ${name}: ${error.message}`)
         } else {
-          console.log(`📊 ${name} restantes: ${data?.length || 0}`)
+          console.log(`ðŸ“Š ${name} restantes: ${data?.length || 0}`)
         }
       } catch (err) {
-        console.log(`❌ Error verificando ${name}: ${err.message}`)
+        console.log(`âŒ Error verificando ${name}: ${err.message}`)
       }
     }
     
-    console.log('\n☢️  LIMPIEZA NUCLEAR COMPLETADA')
-    console.log('💥 TODA LA BASE DE DATOS HA SIDO LIMPIADA')
-    console.log('🔥 TODOS LOS ARCHIVOS HAN SIDO ELIMINADOS')
-    console.log('🚀 LA APLICACIÓN ESTÁ LISTA PARA EMPEZAR DESDE CERO')
+    console.log('\nâ˜¢ï¸  LIMPIEZA NUCLEAR COMPLETADA')
+    console.log('ðŸ’¥ TODA LA BASE DE DATOS HA SIDO LIMPIADA')
+    console.log('ðŸ”¥ TODOS LOS ARCHIVOS HAN SIDO ELIMINADOS')
+    console.log('ðŸš€ LA APLICACIÃ“N ESTÃ LISTA PARA EMPEZAR DESDE CERO')
     
   } catch (error) {
-    console.error('❌ Error durante la limpieza nuclear:', error)
+    console.error('âŒ Error durante la limpieza nuclear:', error)
   }
 }
 
-// Confirmación antes de ejecutar
-console.log('⚠️  ADVERTENCIA: ESTO ELIMINARÁ TODOS LOS DATOS')
-console.log('⚠️  NO SE PUEDE DESHACER')
-console.log('⚠️  ¿Estás seguro? (Ctrl+C para cancelar)')
-console.log('⚠️  Ejecutando en 5 segundos...\n')
+// ConfirmaciÃ³n antes de ejecutar
+console.log('âš ï¸  ADVERTENCIA: ESTO ELIMINARÃ TODOS LOS DATOS')
+console.log('âš ï¸  NO SE PUEDE DESHACER')
+console.log('âš ï¸  Â¿EstÃ¡s seguro? (Ctrl+C para cancelar)')
+console.log('âš ï¸  Ejecutando en 5 segundos...\n')
 
 setTimeout(() => {
   nuclearCleanDatabase()

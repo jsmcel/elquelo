@@ -28,7 +28,7 @@ export default function SuccessPage() {
         setLoading(false)
       }, 1000)
     } else {
-      router.push('/dashboard')
+      router.push('/dashboard/despedida')
     }
   }, [sessionId, router])
 
@@ -91,7 +91,7 @@ export default function SuccessPage() {
 
           <div className="space-y-3">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/dashboard/despedida')}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-white transition-colors hover:bg-primary-700"
             >
               <QrCode className="h-5 w-5" />

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -189,7 +189,7 @@ function buildDesignStateEntry(designData: any, url?: string) {
   }
 }
 
-const FALLBACK_DESTINATION = 'https://elquelo.com/despedida'
+const FALLBACK_DESTINATION = 'https://elquelo.eu/despedida'
 
 export function QRGenerator() {
   const { user } = useUser()
@@ -662,7 +662,7 @@ export function QRGenerator() {
 
   const regenerateQRFiles = async (clonedDesign: any, sourceQRCode: string, targetQRCode: string, availableQRs: QRRow[]) => {
     try {
-      // Buscar archivos de QR en el diseño clonado
+      // Buscar archivos de QR en el diseÃ±o clonado
       const placements = clonedDesign.designsByPlacement || clonedDesign.printful?.placements || {}
       
       for (const [placement, value] of Object.entries(placements)) {
@@ -707,14 +707,14 @@ export function QRGenerator() {
             continue
           }
           
-          // Actualizar la URL en el diseño clonado
+          // Actualizar la URL en el diseÃ±o clonado
           if (typeof value === 'string') {
             clonedDesign.designsByPlacement[placement] = uploadData.url
           } else if (value && typeof value === 'object') {
             (value as any).imageUrl = uploadData.url
           }
           
-          // CRÍTICO: También actualizar en printful.placements si existe
+          // CRÃTICO: TambiÃ©n actualizar en printful.placements si existe
           if (clonedDesign.printful?.placements?.[placement]) {
             clonedDesign.printful.placements[placement].imageUrl = uploadData.url
           }
@@ -972,8 +972,8 @@ export function QRGenerator() {
 
             return (
               <div key={qr.id} className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-sm transition hover:border-primary-200">
-                <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-                  <div className="flex flex-col items-center justify-between rounded-2xl border border-dashed border-gray-300/60 bg-gray-50/80 p-4">
+                <div className="grid gap-6 lg:grid-cols-[220px_1fr] items-start lg:items-stretch">
+                  <div className="flex h-full flex-col items-center justify-between rounded-2xl border border-dashed border-gray-300/60 bg-gray-50/80 p-4">
                     {qrImage ? (
                       <img src={qrImage} alt={`QR ${qr.title ?? qr.code}`} className="h-44 w-44 rounded-2xl border border-white shadow" />
                     ) : (
@@ -1007,7 +1007,7 @@ export function QRGenerator() {
                     </div>
                   </div>
 
-                  <div className="space-y-5">
+                  <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="flex items-center gap-3">
@@ -1139,11 +1139,16 @@ export function QRGenerator() {
                           </div>
                         </div>
                         <button
-                          onClick={() => uploadDesign(qr.code)}
-                          className="inline-flex items-center gap-2 rounded-full border border-gray-200/60 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600"
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            uploadDesign(qr.code)
+                          }}
+                          className="inline-flex items-center gap-2 rounded-full border border-gray-200/60 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200"
                         >
                           <UploadCloud className="h-4 w-4" />
-                          {designState?.loading ? 'Preparando editor...' : 'Editar diseño'}
+                          {designState?.loading ? 'Preparando editor...' : 'Editar diseÃ±o'}
                         </button>
                       </div>
                       <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200/40 bg-white">
@@ -1169,7 +1174,7 @@ export function QRGenerator() {
                                     </div>
                                   )}
                                   <div>
-                                    <p className="font-semibold text-gray-900">Diseño guardado</p>
+                                    <p className="font-semibold text-gray-900">DiseÃ±o guardado</p>
                                     <p className="text-xs text-gray-500">
                                       Variante {designState.printfulSummary?.variantId ?? 'N/A'} -{' '}
                                       {designState.printfulSummary?.size ?? 'Sin talla'} -{' '}
@@ -1220,7 +1225,7 @@ export function QRGenerator() {
                                 onClick={() => uploadDesign(qr.code)}
                                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-primary-200 hover:text-primary-600"
                               >
-                                <UploadCloud className="h-3.5 w-3.5" /> Editar diseño
+                                <UploadCloud className="h-3.5 w-3.5" /> Editar diseÃ±o
                               </button>
                             </div>
                           </div>
@@ -1238,7 +1243,7 @@ export function QRGenerator() {
                           </div>
                         ) : (
                           <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                            No hay diseño todavía. Genera un mockup.
+                            No hay diseÃ±o todavÃ­a. Genera un mockup.
                           </div>
                         )}
                       </div>
@@ -1335,7 +1340,7 @@ export function QRGenerator() {
                   </div>
                 ) : (
                   <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
-                    No encontramos mockups para este diseño. Genera nuevos mockups desde el editor.
+                    No encontramos mockups para este diseÃ±o. Genera nuevos mockups desde el editor.
                   </div>
                 )}
 

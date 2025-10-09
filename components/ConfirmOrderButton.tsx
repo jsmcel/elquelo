@@ -6,11 +6,11 @@ import { toast } from 'react-hot-toast'
 import { ShoppingCart, Loader2, Check } from 'lucide-react'
 
 interface ConfirmOrderButtonProps {
-  qrCodes: string[]
+  qrCodes?: string[]
   className?: string
 }
 
-export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButtonProps) {
+export function ConfirmOrderButton({ qrCodes = [], className = '' }: ConfirmOrderButtonProps) {
   const { user } = useUser()
   const [confirming, setConfirming] = useState(false)
 
@@ -40,27 +40,43 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
         qr_code: code,
       }))
 
-      // Create checkout session
+      // Get event date if available (optional - can be set later)
+      const eventDate = new Date()
+      eventDate.setDate(eventDate.getDate() + 30) // Default 30 days from now
+
+      // Create checkout session with QR codes
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: checkoutItems,
           productType: 'evento',
+          qrCodes: qrCodes, // Pass the QR codes
+          eventDate: eventDate.toISOString(),
+          eventTimezone: 'Europe/Madrid',
+          contentTtlDays: 30,
         }),
       })
 
+      const payload = await checkoutResponse.json().catch(() => null)
+
       if (!checkoutResponse.ok) {
-        throw new Error('Error creando sesión de pago')
+        console.error('Checkout session failed', payload)
+        const message = payload && typeof (payload as any).error === 'string' ? (payload as any).error : 'Error creando sesión de pago'
+        throw new Error(message)
       }
 
-      const { sessionId } = await checkoutResponse.json()
+      const { sessionId } = (payload ?? {}) as { sessionId?: string }
+      if (!sessionId) {
+        throw new Error('No recibimos el identificador de la sesión de pago')
+      }
 
       // Redirect to Stripe checkout
       window.location.href = `/checkout?session_id=${sessionId}`
     } catch (error) {
       console.error('Error en checkout:', error)
-      toast.error('Error procesando el pedido. Inténtalo de nuevo.')
+      const message = error instanceof Error ? error.message : 'Error procesando el pedido. Inténtalo de nuevo.'
+      toast.error(message)
     } finally {
       setConfirming(false)
     }
@@ -118,7 +134,7 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
           {confirming ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin" />
-              Procesando Pedido...
+              Procesando pedido...
             </>
           ) : (
             <>

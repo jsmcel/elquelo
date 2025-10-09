@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
@@ -8,36 +8,162 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// GET - Redirect to QR destination
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu').replace(/\/$/, '')
+
+interface DestinationRecord {
+  id: string
+  type: string
+  target_url: string | null
+  payload: Record<string, any> | null
+  is_active: boolean | null
+  start_at: string | null
+  end_at: string | null
+  priority: number | null
+}
+
+function detectDevice(userAgent: string): string {
+  if (!userAgent) return 'unknown'
+  const ua = userAgent.toLowerCase()
+  if (ua.includes('mobile') || ua.includes('iphone') || ua.includes('android')) {
+    return 'mobile'
+  }
+  if (ua.includes('tablet') || ua.includes('ipad')) {
+    return 'tablet'
+  }
+  return 'desktop'
+}
+
+function isWithinSchedule(destination: DestinationRecord, now: Date): boolean {
+  const start = destination.start_at ? new Date(destination.start_at) : null
+  const end = destination.end_at ? new Date(destination.end_at) : null
+  if (start && now < start) {
+    return false
+  }
+  if (end && now >= end) {
+    return false
+  }
+  return true
+}
+
+function resolveDestination(
+  destinations: DestinationRecord[],
+  now: Date
+): DestinationRecord | null {
+  if (!destinations || destinations.length === 0) {
+    return null
+  }
+
+  const eligible = destinations
+    .filter((destination) => (destination.is_active ?? true) && isWithinSchedule(destination, now))
+    .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+
+  if (eligible.length > 0) {
+    return eligible[0]
+  }
+
+  const fallback = destinations
+    .filter((destination) => destination.is_active ?? true)
+    .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+
+  return fallback[0] ?? null
+}
+
+// GET - Redirect to QR destination with schedule & analytics awareness
 export async function GET(
   req: NextRequest,
   { params }: { params: { code: string } }
 ) {
   try {
     const { code } = params
+    const now = new Date()
+
+    console.log('[QR REDIRECT] Looking for code:', code)
 
     const { data: qr, error } = await supabase
       .from('qrs')
-      .select('*')
+      .select('id, code, destination_url, is_active, scan_count, event_id, active_destination_id')
       .eq('code', code)
-      .eq('is_active', true)
       .single()
 
-    if (error || !qr) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/404`)
+    console.log('[QR REDIRECT] Found QR:', qr ? `${qr.code} (active: ${qr.is_active})` : 'NOT FOUND')
+    console.log('[QR REDIRECT] Error:', error)
+
+    if (error || !qr || qr.is_active === false) {
+      console.log('[QR REDIRECT] Redirecting to 404')
+      return NextResponse.redirect(`${APP_URL}/404`)
     }
 
-    await logScan(qr.id, req)
+    let resolvedUrl = qr.destination_url || APP_URL
+    let destinationId: string | null = qr.active_destination_id ?? null
+    let eventId: string | null = qr.event_id ?? null
+    let eventPhase = 'design'
+    let eventExpired = false
+
+    if (qr.event_id) {
+      const { data: event } = await supabase
+        .from('events')
+        .select('id, status, expires_at, config, event_timezone')
+        .eq('id', qr.event_id)
+        .maybeSingle()
+
+      if (event) {
+        eventId = event.id
+        const expiresAt = event.expires_at ? new Date(event.expires_at) : null
+        eventExpired = Boolean(expiresAt && now >= expiresAt)
+        eventPhase = eventExpired ? 'expired' : event.status || 'live'
+
+        const fallbackUrl =
+          (event.config as any)?.fallback_url || qr.destination_url || APP_URL
+        const expiredUrl = (event.config as any)?.expired_url || `${APP_URL}/evento-expirado`
+
+        const { data: destinations } = await supabase
+          .from('qr_destinations')
+          .select(
+            'id, type, target_url, payload, is_active, start_at, end_at, priority'
+          )
+          .eq('qr_id', qr.id)
+
+        const destinationRecord = eventExpired
+          ? null
+          : resolveDestination(destinations || [], now)
+
+        if (eventExpired) {
+          resolvedUrl = expiredUrl
+          destinationId = null
+        } else if (destinationRecord) {
+          resolvedUrl = destinationRecord.target_url || fallbackUrl
+          destinationId = destinationRecord.id
+        } else {
+          resolvedUrl = fallbackUrl
+          destinationId = null
+        }
+      }
+    }
+
+    resolvedUrl = resolvedUrl || APP_URL
+
+    await logScan({
+      req,
+      qrId: qr.id,
+      eventId,
+      destinationId,
+      resolvedUrl,
+      expired: eventExpired,
+      eventPhase,
+    })
 
     await supabase
       .from('qrs')
-      .update({ scan_count: qr.scan_count + 1 })
+      .update({
+        scan_count: (qr.scan_count || 0) + 1,
+        last_active_at: new Date().toISOString(),
+      })
       .eq('id', qr.id)
 
-    return NextResponse.redirect(qr.destination_url)
+    return NextResponse.redirect(resolvedUrl)
   } catch (error) {
     console.error('Error processing QR redirect:', error)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/404`)
+    return NextResponse.redirect(`${APP_URL}/404`)
   }
 }
 
@@ -178,19 +304,43 @@ export async function DELETE(
   }
 }
 
-async function logScan(qrId: string, req: NextRequest) {
+async function logScan({
+  req,
+  qrId,
+  eventId,
+  destinationId,
+  resolvedUrl,
+  expired,
+  eventPhase,
+}: {
+  req: NextRequest
+  qrId: string
+  eventId: string | null
+  destinationId: string | null
+  resolvedUrl: string
+  expired: boolean
+  eventPhase: string
+}) {
   try {
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const ip =
+      req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
     const userAgent = req.headers.get('user-agent') || 'unknown'
     const referer = req.headers.get('referer') || 'direct'
 
     await supabase.from('scans').insert({
       qr_id: qrId,
+      event_id: eventId,
+      destination_id: destinationId,
       ip_address: ip,
       user_agent: userAgent,
       referer,
+      resolved_url: resolvedUrl,
+      device_type: detectDevice(userAgent),
+      expired,
+      event_phase: eventPhase,
     })
   } catch (error) {
     console.error('Error logging scan:', error)
   }
 }
+

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -24,7 +24,7 @@ interface Participant {
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 const STEPS = ['Despedida', 'Integrantes', 'Crear Grupo']
-const FALLBACK_QR_URL = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.com'}/bienvenida`
+const FALLBACK_QR_URL = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu'}/bienvenida`
 
 const createParticipant = (): Participant => ({
   id: crypto.randomUUID(),
@@ -103,7 +103,7 @@ export default function ConfiguratorPage() {
         throw new Error(data.error || 'No pudimos generar los QRs')
       }
 
-      toast.success('¡Grupo creado exitosamente! Ahora puedes diseñar las camisetas.')
+      toast.success('Â¡Grupo creado exitosamente! Ahora puedes diseÃ±ar las camisetas.')
       
       // Redirect to dashboard
       setTimeout(() => {
@@ -136,7 +136,7 @@ export default function ConfiguratorPage() {
         <div className="mb-10 max-w-3xl">
           <h1 className="text-3xl font-bold sm:text-4xl">Configura tu kit</h1>
           <p className="mt-2 text-gray-600">
-            Crea tu grupo y diseña las camisetas. Solo pagarás cuando confirmes el pedido.
+            Crea tu grupo y diseÃ±a las camisetas. Solo pagarÃ¡s cuando confirmes el pedido.
           </p>
         </div>
 
@@ -152,7 +152,7 @@ export default function ConfiguratorPage() {
                     ? 'bg-primary-600 text-white' 
                     : 'bg-gray-200 text-gray-600'
                 }`}>
-                  {step > index + 1 ? '✓' : index + 1}
+                  {step > index + 1 ? 'âœ“' : index + 1}
                 </div>
                 <span className={`ml-2 text-sm font-medium ${
                   step >= index + 1 ? 'text-gray-900' : 'text-gray-500'
@@ -173,8 +173,8 @@ export default function ConfiguratorPage() {
         {step === 1 && (
           <section className="space-y-6 rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Información del evento</h2>
-              <p className="text-sm text-gray-600">Cuéntanos sobre tu despedida o evento.</p>
+              <h2 className="text-xl font-semibold text-gray-900">InformaciÃ³n del evento</h2>
+              <p className="text-sm text-gray-600">CuÃ©ntanos sobre tu despedida o evento.</p>
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2">
@@ -217,19 +217,19 @@ export default function ConfiguratorPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Integrantes del grupo</h2>
-                <p className="text-sm text-gray-600">Añade los nombres y emails de cada participante.</p>
+                <p className="text-sm text-gray-600">AÃ±ade los nombres y emails de cada participante.</p>
               </div>
               <button
                 onClick={addParticipant}
                 className="inline-flex items-center gap-2 rounded-full border border-primary-200 px-4 py-2 text-sm font-semibold text-primary-600 transition hover:border-primary-400"
               >
-                <Plus className="h-4 w-4" /> Añadir integrante
+                <Plus className="h-4 w-4" /> AÃ±adir integrante
               </button>
             </div>
 
             {participants.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center text-sm text-gray-500">
-                Añade al menos un integrante para continuar.
+                AÃ±ade al menos un integrante para continuar.
               </div>
             ) : (
               <div className="space-y-4">
@@ -309,7 +309,7 @@ export default function ConfiguratorPage() {
           <section className="space-y-6 rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
             <div className="text-center">
               <h2 className="text-xl font-semibold text-gray-900">Crear Grupo</h2>
-              <p className="text-sm text-gray-600">Revisa los integrantes y crea el grupo para empezar a diseñar.</p>
+              <p className="text-sm text-gray-600">Revisa los integrantes y crea el grupo para empezar a diseÃ±ar.</p>
             </div>
 
             {/* Resumen de participantes */}
@@ -339,7 +339,7 @@ export default function ConfiguratorPage() {
 
             {participants.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-gray-200 bg-gray-50 p-10 text-center text-sm text-gray-500">
-                Primero añade la lista de integrantes en el paso anterior.
+                Primero aÃ±ade la lista de integrantes en el paso anterior.
                 <div className="mt-4">
                   <button
                     type="button"
@@ -353,9 +353,9 @@ export default function ConfiguratorPage() {
             ) : (
               <div className="text-center space-y-6">
                 <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold text-green-900 mb-2">¡Listo para crear el grupo!</h3>
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">Â¡Listo para crear el grupo!</h3>
                   <p className="text-green-700">
-                    Después de crear el grupo, podrás diseñar las camisetas en el dashboard.
+                    DespuÃ©s de crear el grupo, podrÃ¡s diseÃ±ar las camisetas en el dashboard.
                   </p>
                 </div>
 

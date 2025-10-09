@@ -4,7 +4,7 @@ async function testConsistentQRGeneration() {
   try {
     console.log('🧪 PROBANDO GENERACIÓN CONSISTENTE DE QR...\n')
     
-    const testUrl = 'http://lql.to/fda8fbe45796'
+    const testUrl = 'https://elquelo.eu/qr/fda8fbe45796'
     
     console.log(`📱 Generando QR para: ${testUrl}`)
     

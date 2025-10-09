@@ -8,10 +8,10 @@ import { StripeProvider } from '@/components/StripeProvider'
 const font = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
 export const metadata: Metadata = {
-  title: 'ELQUELO  Kit de camisetas con QR para despedidas',
+  title: 'ELQUELO — Kit de camisetas con QR para despedidas',
   description:
-    'Organiza una despedida inolvidable con camisetas personalizadas, QR dinmicos y panel de control para cada integrante.',
-  keywords: 'despedidas de soltera, camisetas personalizadas, qr dinmicos, kit despedida',
+    'Organiza una despedida inolvidable con camisetas personalizadas, QR dinámicos y panel de control para cada integrante.',
+  keywords: 'despedidas de soltera, camisetas personalizadas, qr dinámicos, kit despedida',
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Kit ELQUELO para despedidas',
     description:
-      'Camisetas inteligentes con QR dinmico, panel para cambiar el contenido en segundos y entrega express en Espaa.',
+      'Camisetas inteligentes con QR dinámico, panel para cambiar el contenido en segundos y entrega express en España.',
     type: 'website',
     locale: 'es_ES',
     images: [

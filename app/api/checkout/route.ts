@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
+import { promises as fs } from 'fs'
 import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
@@ -70,12 +71,28 @@ export async function POST(req: NextRequest) {
         ? parseInt(contentTtlDays, 10)
         : undefined
 
+    const metadataItemsRaw = (Array.isArray(items) ? items : []).map((item) => ({
+      price: Number(item?.price ?? 0),
+      quantity: Number(item?.quantity ?? 1),
+      qr_code: String(item?.qr_code ?? ''),
+    }))
+
+    let metadataItems = metadataItemsRaw
+    let itemsJson = JSON.stringify(metadataItems)
+    if (itemsJson.length > 500) {
+      metadataItems = metadataItems.map(({ price, quantity, qr_code }) => ({
+        price,
+        quantity,
+        qr_code,
+      }))
+      itemsJson = JSON.stringify(metadataItems)
+    }
+
     const metadataEntries: Record<string, string> = {
       user_id: user.id,
       product_type: productType,
-      items: JSON.stringify(items ?? []),
       subscription_id: subscriptionId ?? '',
-      initial_url: items?.[0]?.initial_url || 'https://elquelo.com/welcome',
+      initial_url: items?.[0]?.initial_url || 'https://elquelo.eu/welcome',
       qr_group_id: qrGroupId ?? '',
       event_type: productType === 'evento' ? 'evento_despedida' : productType,
       event_date: normalizedEventDate,
@@ -86,6 +103,8 @@ export async function POST(req: NextRequest) {
           : '',
       qr_codes: Array.isArray(qrCodes) ? JSON.stringify(qrCodes) : '',
       total_amount_eur: totalAmount ? String(totalAmount) : '',
+      item_count: String(lineItems.length),
+      items: itemsJson,
     }
 
     const metadata = Object.fromEntries(
@@ -119,6 +138,19 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error creating checkout session:', error)
     const message = error instanceof Error ? error.message : 'Failed to create checkout session'
+    try {
+      await fs.appendFile(
+        'checkout-error.log',
+        `\n[${new Date().toISOString()}] ${message}\n${JSON.stringify({
+          items,
+          productType,
+          qrGroupId,
+          qrCodes,
+        })}\n`
+      )
+    } catch (logError) {
+      console.error('Failed to write checkout error log:', logError)
+    }
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

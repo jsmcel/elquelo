@@ -5,7 +5,7 @@ async function testShortUrlFix() {
     console.log('🧪 PROBANDO CORRECCIÓN CON URL CORTA...\n')
     
     const qrCode = 'fda8fbe45796'
-    const shortUrl = `http://lql.to/${qrCode}`
+    const shortUrl = `https://elquelo.eu/qr/${qrCode}`
     const longUrl = `http://localhost:3000/bienvenida?qr=${qrCode}&name=momo&source=qr&timestamp=1759507098541`
     
     console.log('📱 URLs a comparar:')
