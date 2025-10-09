@@ -83,7 +83,7 @@ export function ContentLibrary({ eventId, summary }: ContentLibraryProps) {
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'album': return <Image className="h-4 w-4" alt="" />
+      case 'album': return <Image className="h-4 w-4" />
       case 'mensaje': return <MessageSquare className="h-4 w-4" />
       case 'prueba': return <Trophy className="h-4 w-4" />
       case 'microsite': return <Globe className="h-4 w-4" />
