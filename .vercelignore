@@ -13,7 +13,7 @@ mocks
 docs
 *.sql
 *.zip
-supabase/.temp
+supabase
 apps/mobile
 stripe_1.31.0_windows_x86_64
 printful-catalog-full.xlsx
