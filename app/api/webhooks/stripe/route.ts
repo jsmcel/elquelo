@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
             status: 'paid',
             total_amount: session.amount_total ? session.amount_total / 100 : 0,
             currency: session.currency,
-            shipping_address: session.shipping_details,
+            shipping_address: (session as any).shipping_details,
             created_at: new Date().toISOString()
           })
           .select()
