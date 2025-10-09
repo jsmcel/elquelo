@@ -14,7 +14,7 @@ docs
 *.sql
 *.zip
 supabase/.temp
-apps/mobile/node_modules
+apps/mobile
 stripe_1.31.0_windows_x86_64
 printful-catalog-full.xlsx
 env_complete.txt
