@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { User } from '@supabase/supabase-js'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 interface UserContextType {
   user: User | null
@@ -15,6 +17,15 @@ const UserContext = createContext<UserContextType>({
 })
 
 export const useUser = () => useContext(UserContext)
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minute
+      retry: 1,
+    },
+  },
+})
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -41,8 +52,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [supabase.auth])
 
   return (
-    <UserContext.Provider value={{ user, loading }}>
-      {children}
-    </UserContext.Provider>
+    <QueryClientProvider client={queryClient}>
+      <UserContext.Provider value={{ user, loading }}>
+        {children}
+        <ReactQueryDevtools initialIsOpen={false} />
+      </UserContext.Provider>
+    </QueryClientProvider>
   )
 }
