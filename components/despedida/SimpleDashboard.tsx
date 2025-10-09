@@ -339,7 +339,7 @@ function QRSchedulerWrapper({ qrId, eventId, event, onUpdate }: any) {
     const now = new Date()
     const endTimes = scheduledDestinations
       .map((dest: any) => (dest.end_at ? new Date(dest.end_at).getTime() : null))
-      .filter((value): value is number => value !== null && !Number.isNaN(value))
+      .filter((value: number | null): value is number => value !== null && !Number.isNaN(value))
 
     let startTime = now.getTime()
     if (endTimes.length > 0) {
@@ -351,7 +351,7 @@ function QRSchedulerWrapper({ qrId, eventId, event, onUpdate }: any) {
 
     const upcomingStarts = scheduledDestinations
       .map((dest: any) => (dest.start_at ? new Date(dest.start_at).getTime() : null))
-      .filter((value): value is number => value !== null && !Number.isNaN(value) && value > startTime)
+      .filter((value: number | null): value is number => value !== null && !Number.isNaN(value) && value > startTime)
 
     if (upcomingStarts.length > 0) {
       const nextStart = Math.min(...upcomingStarts)
