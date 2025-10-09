@@ -754,7 +754,7 @@ function ContentPanel({ eventId, event }: any) {
 
 // ============ HELPERS ============
 function ActionCard({ icon, title, description, color, action, href, onClick, external }: any) {
-  const colors = {
+  const colors: Record<string, string> = {
     purple: 'from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700',
     orange: 'from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700',
     green: 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700',
