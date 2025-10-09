@@ -3,6 +3,20 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'cdn.shopify.com', 'printful-upload.s3-accelerate.amazonaws.com'],
   },
+  // Exclude mobile app and supabase functions from Next.js build
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || []
+      config.externals.push({
+        'expo-router': 'commonjs expo-router',
+        'expo-status-bar': 'commonjs expo-status-bar',
+      })
+    }
+    return config
+  },
+  // Exclude specific directories from being processed
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js'].map(ext => `page.${ext}`).concat(['tsx', 'ts', 'jsx', 'js']),
+  transpilePackages: [],
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
