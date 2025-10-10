@@ -29,11 +29,8 @@ export async function POST(req: NextRequest) {
       .from('orders')
       .insert({
         user_id: user.id,
-        product_type: productType,
-        items: items,
         total_amount: totalAmount,
         status: 'pending',
-        subscription_id: subscriptionId,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -42,6 +39,27 @@ export async function POST(req: NextRequest) {
     if (orderError) {
       console.error('Error saving order:', orderError)
       return NextResponse.json({ error: 'Failed to save order' }, { status: 500 })
+    }
+
+    // Save order items separately
+    const orderItems = items.map((item: any) => ({
+      order_id: orderData.id,
+      product_name: item.name,
+      product_description: item.description,
+      variant_id: item.variant_id,
+      qr_code: item.qr_code,
+      price: item.price,
+      quantity: item.quantity,
+      product_id: item.product_id,
+    }))
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems)
+
+    if (itemsError) {
+      console.error('Error saving order items:', itemsError)
+      return NextResponse.json({ error: 'Failed to save order items' }, { status: 500 })
     }
     
     // Create Stripe checkout session
