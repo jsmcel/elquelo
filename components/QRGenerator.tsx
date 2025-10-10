@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { MultiProductDesignEditor } from './MultiProductDesignEditor'
 import { QRProductsList } from './QRProductsList'
+import { ViewMultiProductDesignModal } from './ViewMultiProductDesignModal'
+import { migrateLegacyDesign } from '@/types/qr-product'
 
 interface QRRow {
   id: string
@@ -1260,134 +1262,23 @@ export function QRGenerator() {
         />
       )}
 
-      {/* Modal para ver diseno */}
+      {/* Modal para ver diseño multi-producto */}
       {viewDesignOpen && viewingDesign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Mockups - {viewingDesign.code}
-              </h3>
-              <button
-                onClick={() => {
-                  setViewDesignOpen(false)
-                  setViewingDesign(null)
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900">Variante</h4>
-                    <div className="mt-2 space-y-1 text-sm text-gray-600">
-                      <p>ID variante: {viewingSummary?.variantId ?? 'N/D'}</p>
-                      <p>Talla: {viewingSummary?.size ?? 'Sin talla'}</p>
-                      <p>Color: {viewingSummary?.color ?? 'Sin color'}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900">Detalles del guardado</h4>
-                    <div className="mt-2 space-y-1 text-sm text-gray-600">
-                      <p>Producto: {viewingDesign.designData?.printfulProduct?.name || 'Producto personalizado'}</p>
-                      <p>Guardado: {new Date(viewingDesign.designData?.savedAt || viewingDesign.designData?.createdAt || Date.now()).toLocaleString()}</p>
-                      <p>QR destino: {viewingDesign.code}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {viewingMockups.length > 0 ? (
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Mockups generados</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {viewingMockups.map((mockup) => (
-                        <div key={`${mockup.placement}-${mockup.url}`} className="space-y-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                          <img
-                            src={mockup.url}
-                            alt={`Mockup ${mockup.placement}`}
-                            className="w-full rounded-lg object-cover"
-                          />
-                          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{mockup.placement}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : viewingPreviewUrl ? (
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Vista previa</h4>
-                    <div className="flex justify-center">
-                      <img
-                        src={viewingPreviewUrl}
-                        alt={`Diseno ${viewingDesign.code}`}
-                        className="max-h-96 rounded-xl border border-gray-200 bg-white object-contain"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
-                    No encontramos mockups para este diseño. Genera nuevos mockups desde el editor.
-                  </div>
-                )}
-
-                {viewingPlacements.length > 0 && (
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Archivos por posicion</h4>
-                    <div className="space-y-2 text-sm text-gray-600">
-                      {viewingPlacements.map(([placement, value]) => {
-                        const imageUrl = typeof value === 'string' ? value : value?.imageUrl
-                        if (!imageUrl) {
-                          return null
-                        }
-                        return (
-                          <div key={placement} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
-                            <span className="font-medium text-gray-800">{placement}</span>
-                            <a
-                              href={imageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" /> Abrir
-                            </a>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-3 border-t pt-4">
-                  <button
-                    onClick={() => {
-                      setViewDesignOpen(false)
-                      setViewingDesign(null)
-                    }}
-                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300"
-                  >
-                    Cerrar
-                  </button>
-                  {viewingPreviewUrl && (
-                    <button
-                      onClick={() => {
-                        const link = document.createElement('a')
-                        link.href = viewingPreviewUrl
-                        link.target = '_blank'
-                        link.rel = 'noopener noreferrer'
-                        link.click()
-                      }}
-                      className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
-                    >
-                      <Download className="h-4 w-4" /> Abrir archivo
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ViewMultiProductDesignModal
+          qrCode={viewingDesign.code}
+          designData={viewingDesign.designData}
+          onClose={() => {
+            setViewDesignOpen(false)
+            setViewingDesign(null)
+          }}
+          onEdit={(code) => {
+            const qr = qrs.find(q => q.code === code)
+            if (qr) {
+              setEditingQR(qr)
+              setEditorOpen(true)
+            }
+          }}
+        />
       )}
       {/* Modal para copiar diseno */}
       {copyDesignOpen && sourceDesign && (
