@@ -1113,17 +1113,6 @@ export function QRGenerator() {
                     ) : (
                       <div className="space-y-3 text-sm text-gray-700">
                         {qr.description && <p className="text-gray-600">{qr.description}</p>}
-                        <div>
-                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">URL actual</span>
-                          <a
-                            href={qr.destination_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 block break-words font-semibold text-primary-600 hover:text-primary-700"
-                          >
-                            {qr.destination_url}
-                          </a>
-                        </div>
                       </div>
                     )}
 
