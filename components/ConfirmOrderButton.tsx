@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUser } from '@/app/providers'
 import { toast } from 'react-hot-toast'
 import { ShoppingCart, Loader2, Check } from 'lucide-react'
@@ -10,9 +10,119 @@ interface ConfirmOrderButtonProps {
   className?: string
 }
 
+interface QRDesignData {
+  code: string
+  variantId: number | null
+  productName: string
+  price: number
+}
+
 export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButtonProps) {
   const { user } = useUser()
   const [confirming, setConfirming] = useState(false)
+  const [loadingPrices, setLoadingPrices] = useState(true)
+  const [qrDesigns, setQrDesigns] = useState<QRDesignData[]>([])
+  const [totalPrice, setTotalPrice] = useState(0)
+
+  // Cargar diseños y precios al montar
+  useEffect(() => {
+    async function loadDesignsAndPrices() {
+      if (!user || qrCodes.length === 0) {
+        setLoadingPrices(false)
+        return
+      }
+
+      try {
+        // Cargar diseños de todos los QRs
+        const designPromises = qrCodes.map(async (code) => {
+          try {
+            const response = await fetch(`/api/design/${code}`)
+            if (response.ok) {
+              const data = await response.json()
+              return {
+                code,
+                designData: data.designData
+              }
+            }
+          } catch (error) {
+            console.error(`Error loading design for ${code}:`, error)
+          }
+          return { code, designData: null }
+        })
+
+        const designs = await Promise.all(designPromises)
+        
+        // Extraer variantIds
+        const variantIds = designs
+          .map(d => d.designData?.printfulProduct?.variantId || d.designData?.printful?.variantId)
+          .filter(id => id !== null && id !== undefined)
+
+        if (variantIds.length === 0) {
+          // Si no hay variants, usar precio por defecto
+          const defaultDesigns: QRDesignData[] = qrCodes.map(code => ({
+            code,
+            variantId: null,
+            productName: 'Producto personalizado',
+            price: 29 // Precio fallback
+          }))
+          setQrDesigns(defaultDesigns)
+          setTotalPrice(qrCodes.length * 29)
+          setLoadingPrices(false)
+          return
+        }
+
+        // Obtener precios de las variantes
+        const priceResponse = await fetch('/api/printful/variants/price', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variantIds })
+        })
+
+        if (!priceResponse.ok) {
+          throw new Error('Error obteniendo precios')
+        }
+
+        const { prices } = await priceResponse.json()
+
+        // Crear lista de QR con sus precios
+        const designsWithPrices: QRDesignData[] = designs.map(({ code, designData }) => {
+          const variantId = designData?.printfulProduct?.variantId || designData?.printful?.variantId
+          const productName = designData?.printfulProduct?.name || designData?.productName || 'Producto personalizado'
+          
+          let price = 29 // Fallback
+          if (variantId && prices[variantId]) {
+            price = prices[variantId].finalPrice
+          }
+
+          return {
+            code,
+            variantId,
+            productName,
+            price
+          }
+        })
+
+        setQrDesigns(designsWithPrices)
+        const total = designsWithPrices.reduce((sum, item) => sum + item.price, 0)
+        setTotalPrice(Math.round(total * 100) / 100)
+      } catch (error) {
+        console.error('Error loading prices:', error)
+        // Usar precios por defecto en caso de error
+        const defaultDesigns: QRDesignData[] = qrCodes.map(code => ({
+          code,
+          variantId: null,
+          productName: 'Producto personalizado',
+          price: 29
+        }))
+        setQrDesigns(defaultDesigns)
+        setTotalPrice(qrCodes.length * 29)
+      } finally {
+        setLoadingPrices(false)
+      }
+    }
+
+    loadDesignsAndPrices()
+  }, [user, qrCodes])
 
   const handleConfirmOrder = async () => {
     if (!user) {
@@ -20,24 +130,22 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
       return
     }
 
-    if (qrCodes.length === 0) {
-      toast.error('No hay QRs para confirmar')
+    if (qrDesigns.length === 0) {
+      toast.error('No hay productos para confirmar')
       return
     }
 
     setConfirming(true)
 
     try {
-      // Calculate total price (€29 per QR)
-      const totalPrice = qrCodes.length * 29
-
-      // Prepare checkout items
-      const checkoutItems = qrCodes.map((code, index) => ({
-        name: `Camiseta ${index + 1}`,
-        description: `Camiseta personalizada con QR ${code}`,
-        price: 29,
+      // Prepare checkout items con precios reales
+      const checkoutItems = qrDesigns.map((design, index) => ({
+        name: design.productName,
+        description: `Producto personalizado con QR ${design.code}`,
+        price: design.price,
         quantity: 1,
-        qr_code: code,
+        qr_code: design.code,
+        variant_id: design.variantId
       }))
 
       // Create checkout session
@@ -76,14 +184,26 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
         <div>
           <h3 className="text-xl font-bold text-primary-900">🚀 ¡Listo para Confirmar!</h3>
           <p className="text-sm text-primary-700">
-            {qrCodes.length} camiseta{qrCodes.length > 1 ? 's' : ''} lista{qrCodes.length > 1 ? 's' : ''} para confirmar
+            {qrCodes.length} producto{qrCodes.length > 1 ? 's' : ''} list{qrCodes.length > 1 ? 'os' : 'o'} para confirmar
           </p>
         </div>
         <div className="text-right">
-          <div className="text-3xl font-bold text-primary-600">
-            €{qrCodes.length * 29}
-          </div>
-          <div className="text-sm text-primary-500 font-medium">Total</div>
+          {loadingPrices ? (
+            <>
+              <div className="text-2xl font-bold text-primary-600">
+                <Loader2 className="h-6 w-6 animate-spin inline" />
+              </div>
+              <div className="text-xs text-primary-500 font-medium">Calculando...</div>
+            </>
+          ) : (
+            <>
+              <div className="text-3xl font-bold text-primary-600">
+                €{totalPrice.toFixed(2)}
+              </div>
+              <div className="text-sm text-primary-500 font-medium">Total</div>
+              <div className="text-xs text-primary-400">Incluye markup 40%</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -93,7 +213,7 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
           <ul className="text-sm text-primary-800 space-y-2">
             <li className="flex items-center">
               <Check className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
-              {qrCodes.length} camiseta{qrCodes.length > 1 ? 's' : ''} premium
+              {qrCodes.length} producto{qrCodes.length > 1 ? 's' : ''} premium
             </li>
             <li className="flex items-center">
               <Check className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
@@ -107,12 +227,17 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
               <Check className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
               Entrega en 5-7 días laborables
             </li>
+            {!loadingPrices && qrDesigns.length > 0 && (
+              <li className="text-xs text-primary-600 mt-2 pt-2 border-t border-primary-200">
+                Precio base Printful + 40% markup
+              </li>
+            )}
           </ul>
         </div>
 
         <button
           onClick={handleConfirmOrder}
-          disabled={confirming}
+          disabled={confirming || loadingPrices}
           className="w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-4 text-base font-bold text-white hover:from-primary-700 hover:to-primary-800 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
         >
           {confirming ? (
@@ -129,7 +254,7 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
         </button>
 
         <p className="text-xs text-primary-600 text-center font-medium">
-          🔒 Pago seguro con Stripe • Procesaremos tu pedido y te enviaremos las camisetas en 5-7 días laborables
+          🔒 Pago seguro con Stripe • Procesaremos tu pedido y te enviaremos los productos en 5-7 días laborables
         </p>
       </div>
     </div>
