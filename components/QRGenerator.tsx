@@ -612,6 +612,29 @@ export function QRGenerator() {
   const handleCopyDesignToQRs = async () => {
     if (!sourceDesign || selectedTargetQRs.length === 0) return
 
+    // Validar que todos los QRs destino tengan productos homogéneos
+    const sourceMigrated = migrateLegacyDesign(sourceDesign.designData)
+    const sourceProductIds = new Set(sourceMigrated.products.map(p => p.productId))
+
+    for (const targetCode of selectedTargetQRs) {
+      const targetDesign = designs[targetCode]?.designData
+      if (targetDesign) {
+        const targetMigrated = migrateLegacyDesign(targetDesign)
+        const targetProductIds = new Set(targetMigrated.products.map(p => p.productId))
+        
+        // Verificar que ambos conjuntos sean iguales
+        const sameProducts = 
+          sourceProductIds.size === targetProductIds.size &&
+          [...sourceProductIds].every(id => targetProductIds.has(id))
+        
+        if (!sameProducts) {
+          toast.error(`El QR ${targetCode} no tiene los mismos productos. Solo se pueden copiar diseños entre productos homogéneos.`)
+          setCopyingDesign(false)
+          return
+        }
+      }
+    }
+
     setCopyingDesign(true)
     try {
       // Obtener QRs destino (excluyendo el QR origen)
@@ -1303,21 +1326,49 @@ export function QRGenerator() {
               <div className="space-y-4">
                 {/* Informacion del diseno origen */}
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Diseno origen</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">Diseño origen</h4>
                   <div className="text-sm text-blue-700">
                     <div>QR: {sourceDesign.code}</div>
-                    <div>Imagenes: {sourceDesign.designData?.confirmedImages?.length || 0}</div>
-                    <div>Lado: {sourceDesign.designData?.side || 'No especificado'}</div>
+                    <div>Productos: {(() => {
+                      const migrated = migrateLegacyDesign(sourceDesign.designData)
+                      return migrated.products.map(p => p.productName).join(', ')
+                    })()}</div>
                   </div>
                 </div>
 
                 {/* Seleccion de QRs destino */}
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">Seleccionar QRs destino</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Seleccionar QRs destino (solo productos homogéneos)</h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {qrs
-                      .filter(qr => qr.code !== sourceDesign.code) // Excluir el QR origen
-                      .map((qr) => (
+                    {(() => {
+                      const sourceMigrated = migrateLegacyDesign(sourceDesign.designData)
+                      const sourceProductIds = new Set(sourceMigrated.products.map(p => p.productId))
+                      
+                      const compatibleQRs = qrs
+                        .filter(qr => qr.code !== sourceDesign.code)
+                        .filter(qr => {
+                          const targetDesign = designs[qr.code]?.designData
+                          if (!targetDesign) return false
+                          
+                          const targetMigrated = migrateLegacyDesign(targetDesign)
+                          const targetProductIds = new Set(targetMigrated.products.map(p => p.productId))
+                          
+                          // Verificar que ambos conjuntos sean iguales
+                          return (
+                            sourceProductIds.size === targetProductIds.size &&
+                            [...sourceProductIds].every(id => targetProductIds.has(id))
+                          )
+                        })
+                      
+                      if (compatibleQRs.length === 0) {
+                        return (
+                          <div className="bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800">
+                            No hay QRs compatibles. Solo se pueden copiar diseños entre QRs que tengan exactamente los mismos productos.
+                          </div>
+                        )
+                      }
+                      
+                      return compatibleQRs.map((qr) => (
                         <label key={qr.code} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input
                             type="checkbox"
@@ -1340,12 +1391,13 @@ export function QRGenerator() {
                             </div>
                             {designs[qr.code]?.hasDesign && (
                               <div className="text-xs text-orange-600 mt-1">
-                                WARNING Ya tiene diseno - se sobrescribira
+                                ⚠️ Ya tiene diseño - se sobrescribirá
                               </div>
                             )}
                           </div>
                         </label>
-                      ))}
+                      ))
+                    })()}
                   </div>
                 </div>
 
