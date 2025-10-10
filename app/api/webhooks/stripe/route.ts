@@ -58,11 +58,11 @@ export async function POST(req: NextRequest) {
 
         console.log('Order updated successfully:', order.id)
 
-        // CREAR LA DESPEDIDA DESPUÉS DEL PAGO EXITOSO
+        // CREAR GRUPO Y ASOCIAR QRs EXISTENTES
         try {
-          console.log('Creating despedida after successful payment...')
+          console.log('Creating group and associating existing QRs...')
           
-          // Obtener los items de la orden para crear la despedida
+          // Obtener los items de la orden para asociar los QRs
           const { data: orderItems, error: itemsError } = await supabase
             .from('order_items')
             .select('*')
@@ -71,39 +71,56 @@ export async function POST(req: NextRequest) {
           if (itemsError) {
             console.error('Error fetching order items:', itemsError)
           } else if (orderItems && orderItems.length > 0) {
-            // Crear la despedida usando el configurador
-            const createDespedidaResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/qr/create`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                // Datos básicos para crear la despedida
-                groupName: `Despedida - ${new Date().toLocaleDateString()}`,
+            // 1. Crear el grupo
+            const { data: group, error: groupError } = await supabase
+              .from('groups')
+              .insert({
+                name: `Despedida - ${new Date().toLocaleDateString()}`,
                 description: 'Despedida creada automáticamente después del pago',
-                members: orderItems.map((item, index) => ({
-                  name: `Participante ${index + 1}`,
-                  email: session.customer_email,
-                  size: item.size || 'M',
-                  is_novio_novia: false
-                })),
-                selectedPackages: ['camisetas'], // Paquete que se compró
-                // Datos del checkout
-                checkoutSessionId: session.id,
-                orderId: session.metadata?.order_id
+                created_by: session.metadata?.user_id,
+                created_at: new Date().toISOString()
               })
-            })
+              .select()
+              .single()
 
-            if (createDespedidaResponse.ok) {
-              const despedidaResult = await createDespedidaResponse.json()
-              console.log('Despedida created successfully:', despedidaResult)
+            if (groupError) {
+              console.error('Error creating group:', groupError)
             } else {
-              console.error('Failed to create despedida:', await createDespedidaResponse.text())
+              console.log('Group created successfully:', group.id)
+              
+              // 2. Asociar QRs existentes al grupo (buscar QRs del usuario)
+              const { data: userQRs, error: qrsError } = await supabase
+                .from('qrs')
+                .select('id, code')
+                .eq('user_id', session.metadata?.user_id)
+                .limit(orderItems.length)
+
+              if (qrsError) {
+                console.error('Error fetching user QRs:', qrsError)
+              } else if (userQRs && userQRs.length > 0) {
+                // 3. Crear group_members para cada QR
+                const groupMembers = userQRs.map((qr, index) => ({
+                  group_id: group.id,
+                  qr_id: qr.id,
+                  role: index === 0 ? 'admin' : 'member',
+                  created_at: new Date().toISOString()
+                }))
+
+                const { error: membersError } = await supabase
+                  .from('group_members')
+                  .insert(groupMembers)
+
+                if (membersError) {
+                  console.error('Error creating group members:', membersError)
+                } else {
+                  console.log('Group members created successfully for', groupMembers.length, 'QRs')
+                }
+              }
             }
           }
-        } catch (despedidaError) {
-          console.error('Error creating despedida:', despedidaError)
-          // No fallar el webhook si la creación de despedida falla
+        } catch (groupError) {
+          console.error('Error creating group:', groupError)
+          // No fallar el webhook si la creación del grupo falla
         }
 
         // Enviar pedido a Printful automáticamente
