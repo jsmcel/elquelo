@@ -24,7 +24,7 @@ interface Participant {
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 const STEPS = ['Despedida', 'Integrantes', 'Crear Grupo']
-const FALLBACK_QR_URL = `${process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.com'}/bienvenida`
+const FALLBACK_QR_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu'
 
 const createParticipant = (): Participant => ({
   id: crypto.randomUUID(),
