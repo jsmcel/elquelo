@@ -103,3 +103,4 @@ COMMENT ON FUNCTION execute_qr_triggers IS 'Ejecuta todos los triggers asociados
 
 
 
+
