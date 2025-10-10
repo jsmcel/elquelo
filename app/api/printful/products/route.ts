@@ -135,14 +135,16 @@ function normalizePlacements(source: any): CatalogPlacement[] {
 
   filesArray.forEach((file) => {
     if (!file) return
-    const code = coerceString(file.placement || file.type || file.id || file.title)
+    // Priorizar file.id (único) o file.type, nunca file.title como código
+    const code = coerceString(file.id || file.type || file.placement)
     if (!code) return
     const id = code.toLowerCase()
-    const label = coerceString(file.title || file.label || file.type || file.id || file.placement) || code
+    const label = coerceString(file.title || file.label) || code
     const additionalPrice = coerceNumber(file.additional_price ?? file.additionalPrice ?? null)
 
     const existing = placements.get(id)
     if (existing) {
+      // Si ya existe, solo actualizar el precio si es mayor
       if (additionalPrice !== null && (existing.additionalPrice === null || additionalPrice > existing.additionalPrice)) {
         existing.additionalPrice = additionalPrice
       }
