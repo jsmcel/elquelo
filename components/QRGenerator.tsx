@@ -19,7 +19,7 @@ import {
   Image as ImageIcon,
   Eye,
 } from 'lucide-react'
-import { PrintfulDesignEditor } from './PrintfulDesignEditor'
+import { MultiProductDesignEditor } from './MultiProductDesignEditor'
 
 interface QRRow {
   id: string
@@ -1240,9 +1240,9 @@ export function QRGenerator() {
         </div>
       )}
       
-      {/* Editor de Diseño */}
+      {/* Editor de Diseño Multi-Producto */}
       {editorOpen && editingQR && (
-        <PrintfulDesignEditor
+        <MultiProductDesignEditor
           // Use short code for filenames/metadatos
           qrCode={editingQR.code}
           // Use canonical content (same as dashboard) for QR encoding
