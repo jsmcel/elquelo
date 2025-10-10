@@ -58,6 +58,54 @@ export async function POST(req: NextRequest) {
 
         console.log('Order updated successfully:', order.id)
 
+        // CREAR LA DESPEDIDA DESPUÉS DEL PAGO EXITOSO
+        try {
+          console.log('Creating despedida after successful payment...')
+          
+          // Obtener los items de la orden para crear la despedida
+          const { data: orderItems, error: itemsError } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', session.metadata?.order_id)
+
+          if (itemsError) {
+            console.error('Error fetching order items:', itemsError)
+          } else if (orderItems && orderItems.length > 0) {
+            // Crear la despedida usando el configurador
+            const createDespedidaResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/qr/create`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                // Datos básicos para crear la despedida
+                groupName: `Despedida - ${new Date().toLocaleDateString()}`,
+                description: 'Despedida creada automáticamente después del pago',
+                members: orderItems.map((item, index) => ({
+                  name: `Participante ${index + 1}`,
+                  email: session.customer_email,
+                  size: item.size || 'M',
+                  is_novio_novia: false
+                })),
+                selectedPackages: ['camisetas'], // Paquete que se compró
+                // Datos del checkout
+                checkoutSessionId: session.id,
+                orderId: session.metadata?.order_id
+              })
+            })
+
+            if (createDespedidaResponse.ok) {
+              const despedidaResult = await createDespedidaResponse.json()
+              console.log('Despedida created successfully:', despedidaResult)
+            } else {
+              console.error('Failed to create despedida:', await createDespedidaResponse.text())
+            }
+          }
+        } catch (despedidaError) {
+          console.error('Error creating despedida:', despedidaError)
+          // No fallar el webhook si la creación de despedida falla
+        }
+
         // Enviar pedido a Printful automáticamente
         try {
           const printfulResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/orders`, {
