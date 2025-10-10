@@ -4,19 +4,76 @@ import path from 'path'
 
 const CATALOG_PATH = path.resolve(process.cwd(), 'mocks', 'printful-catalog-full.json')
 const MARKUP_PERCENTAGE = 40 // 40% markup
+const FALLBACK_EXCHANGE_RATE = 0.92 // Fallback si falla la API de tipo de cambio
 
 interface CachedCatalog {
   data: any
   timestamp: number
 }
 
+interface ExchangeRateCache {
+  rate: number
+  timestamp: number
+}
+
 let cachedCatalog: CachedCatalog | null = null
-const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutos
+let cachedExchangeRate: ExchangeRateCache | null = null
+const CATALOG_CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutos
+const EXCHANGE_RATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 horas
+
+async function getExchangeRate(): Promise<number> {
+  const now = Date.now()
+  
+  // Verificar cache
+  if (cachedExchangeRate && (now - cachedExchangeRate.timestamp) < EXCHANGE_RATE_CACHE_TTL_MS) {
+    return cachedExchangeRate.rate
+  }
+
+  try {
+    // Obtener tipo de cambio de Frankfurter API
+    const response = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR', {
+      next: { revalidate: 86400 } // Cache de Next.js por 24h
+    })
+
+    if (!response.ok) {
+      throw new Error(`Frankfurter API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const rate = data?.rates?.EUR
+
+    if (typeof rate !== 'number' || isNaN(rate) || rate <= 0) {
+      throw new Error('Invalid exchange rate from API')
+    }
+
+    // Cachear el resultado
+    cachedExchangeRate = {
+      rate,
+      timestamp: now
+    }
+
+    console.log(`✅ Exchange rate updated: 1 USD = ${rate} EUR`)
+    return rate
+
+  } catch (error) {
+    console.error('⚠️ Error fetching exchange rate, using fallback:', error)
+    
+    // Si hay un cache antiguo, usarlo
+    if (cachedExchangeRate) {
+      console.log(`Using stale cached rate: ${cachedExchangeRate.rate}`)
+      return cachedExchangeRate.rate
+    }
+    
+    // Usar fallback
+    console.log(`Using fallback rate: ${FALLBACK_EXCHANGE_RATE}`)
+    return FALLBACK_EXCHANGE_RATE
+  }
+}
 
 async function loadCatalog() {
   const now = Date.now()
   
-  if (cachedCatalog && (now - cachedCatalog.timestamp) < CACHE_TTL_MS) {
+  if (cachedCatalog && (now - cachedCatalog.timestamp) < CATALOG_CACHE_TTL_MS) {
     return cachedCatalog.data
   }
 
@@ -57,9 +114,8 @@ function findVariantInCatalog(catalog: any, variantId: number): { price: number;
   return null
 }
 
-function convertUSDtoEUR(usd: number): number {
-  // Tipo de cambio aproximado USD -> EUR (actualizar según necesidad)
-  const exchangeRate = 0.92
+async function convertUSDtoEUR(usd: number): Promise<number> {
+  const exchangeRate = await getExchangeRate()
   return usd * exchangeRate
 }
 
@@ -79,6 +135,7 @@ export async function POST(req: NextRequest) {
     }
 
     const catalog = await loadCatalog()
+    const exchangeRate = await getExchangeRate()
     const prices: Record<number, { basePrice: number; finalPrice: number; currency: string }> = {}
 
     for (const variantId of variantIds) {
@@ -91,8 +148,8 @@ export async function POST(req: NextRequest) {
       const variantData = findVariantInCatalog(catalog, numericId)
       
       if (variantData) {
-        // Convertir USD a EUR
-        const basePriceEUR = convertUSDtoEUR(variantData.price)
+        // Convertir USD a EUR con tipo de cambio real
+        const basePriceEUR = await convertUSDtoEUR(variantData.price)
         // Aplicar markup del 40%
         const finalPriceEUR = applyMarkup(basePriceEUR)
         
@@ -107,7 +164,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       prices,
-      markup: MARKUP_PERCENTAGE
+      markup: MARKUP_PERCENTAGE,
+      exchangeRate: Math.round(exchangeRate * 10000) / 10000 // 4 decimales
     })
   } catch (error) {
     console.error('Error calculating prices:', error)
