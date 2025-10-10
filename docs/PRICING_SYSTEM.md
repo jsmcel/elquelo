@@ -47,8 +47,10 @@ Response: {
 
 **Configuración**:
 - Catálogo: `mocks/printful-catalog-full.json`
-- Cache: 15 minutos
-- Tipo de cambio USD→EUR: **0.92** (editable en línea 68)
+- Cache catálogo: 15 minutos
+- Tipo de cambio USD→EUR: **Automático** desde Frankfurter API (Banco Central Europeo)
+- Cache tipo de cambio: 24 horas
+- Tipo de cambio fallback: **0.92** (si falla la API)
 - Markup: **40%** (editable en línea 6)
 
 ### 2. ConfirmOrderButton Mejorado
@@ -68,13 +70,16 @@ Producto: Unisex Staple T-Shirt
 Variant: XL, Black
 Precio Printful (USD): $18.50
 
-Paso 1: Convertir a EUR
-$18.50 × 0.92 = €17.02
+Paso 1: Obtener tipo de cambio del día
+API Frankfurter → 1 USD = 0.9245 EUR
 
-Paso 2: Aplicar markup 40%
-€17.02 × 1.40 = €23.83
+Paso 2: Convertir a EUR
+$18.50 × 0.9245 = €17.10
 
-Precio final al cliente: €23.83
+Paso 3: Aplicar markup 40%
+€17.10 × 1.40 = €23.94
+
+Precio final al cliente: €23.94
 ```
 
 ## ⚙️ Configuración
@@ -87,16 +92,17 @@ Edita `app/api/printful/variants/price/route.ts` línea 6:
 const MARKUP_PERCENTAGE = 40 // Cambiar aquí (ej: 50 para 50%)
 ```
 
-### Cambiar el Tipo de Cambio
+### Cambiar el Tipo de Cambio Fallback
 
-Edita `app/api/printful/variants/price/route.ts` línea 68:
+El tipo de cambio se obtiene automáticamente de la API de Frankfurter (Banco Central Europeo).
+
+Si quieres cambiar el **valor fallback** (usado si falla la API), edita `app/api/printful/variants/price/route.ts` línea 7:
 
 ```typescript
-function convertUSDtoEUR(usd: number): number {
-  const exchangeRate = 0.92 // Cambiar aquí
-  return usd * exchangeRate
-}
+const FALLBACK_EXCHANGE_RATE = 0.92  // ← Cambiar fallback aquí
 ```
+
+**Nota**: El tipo de cambio real se actualiza automáticamente cada 24 horas desde la API.
 
 ### Cambiar el Precio Fallback
 
@@ -137,13 +143,45 @@ console.log('Total:', total)
 
 - Los precios se cachean 15 minutos para mejorar rendimiento
 - El catálogo se actualiza automáticamente cada día a las 3:00 AM UTC (GitHub Action)
-- Los precios en el checkout de Stripe usan los precios calculados, no el fallback
-- El tipo de cambio es fijo (0.92), considera actualizarlo periódicamente
+- El tipo de cambio se obtiene automáticamente de Frankfurter API (datos del BCE)
+- El tipo de cambio se cachea 24 horas y se actualiza automáticamente
+- Los precios en el checkout de Stripe usan los precios calculados con tipo de cambio real
+- Si falla la API de tipo de cambio, usa el valor fallback (0.92)
 
-## 🔄 Actualizar Catálogo Manualmente
+## 🔄 Actualizar Manualmente
+
+### Actualizar Catálogo de Productos
 
 1. Ve a GitHub → Actions → "Update Printful Catalog"
 2. Click "Run workflow"
 3. Espera 5-10 minutos
 4. El catálogo se actualizará automáticamente
+
+### Ver Tipo de Cambio Actual
+
+Puedes consultar el tipo de cambio actual que está usando el sistema:
+
+```bash
+GET https://elquelo.eu/api/exchange-rate
+```
+
+Respuesta:
+```json
+{
+  "success": true,
+  "rate": 0.9245,
+  "from": "USD",
+  "to": "EUR",
+  "source": "api",
+  "cachedAt": "2025-01-10T10:30:00.000Z",
+  "expiresIn": 82800000
+}
+```
+
+### Fuente del Tipo de Cambio
+
+- **API**: Frankfurter (https://www.frankfurter.app)
+- **Datos**: Banco Central Europeo
+- **Actualización**: Cada 24 horas automáticamente
+- **Gratuito**: Sin límite de requests
 
