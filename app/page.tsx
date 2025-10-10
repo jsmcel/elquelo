@@ -71,12 +71,9 @@ export default function Home() {
 
       <section className="relative overflow-hidden bg-gray-950 text-white">
         <div className="absolute inset-0">
-          {/* Imagen de fondo */}
+          {/* Imagen de fondo - gradient como fallback */}
           <div 
-            className="h-full w-full bg-cover bg-center bg-no-repeat"
-            style={{
-              backgroundImage: 'url(/hero-bg.jpg)', // Cambia por tu imagen
-            }}
+            className="h-full w-full bg-gradient-to-br from-primary-600 to-primary-800"
           />
           {/* Overlay para mejorar legibilidad */}
           <div className="absolute inset-0 bg-black/40" />

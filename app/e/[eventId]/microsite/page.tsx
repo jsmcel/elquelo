@@ -15,13 +15,20 @@ export default async function PublicMicrositePage({ params }: MicrositePageProps
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, name, description, event_date')
+    .select('id, name, description, event_date, qr_group_id')
     .eq('id', eventId)
     .single()
 
   if (!event) {
     notFound()
   }
+
+  // Obtener participantes del grupo
+  const { data: participants } = await supabase
+    .from('group_members')
+    .select('name, title')
+    .eq('group_id', event.qr_group_id)
+    .order('created_at', { ascending: true })
 
   const { data: micrositeModule } = await supabase
     .from('event_modules')
@@ -33,7 +40,7 @@ export default async function PublicMicrositePage({ params }: MicrositePageProps
 
   const settings = micrositeModule?.settings || {
     title: event.name || 'Evento',
-    subtitle: '',
+    subtitle: event.description || '',
     heroImage: '',
     primaryColor: '#6366f1',
     sections: []
@@ -91,14 +98,63 @@ export default async function PublicMicrositePage({ params }: MicrositePageProps
       {/* Contenido de secciones */}
       <div className="max-w-6xl mx-auto px-6 py-16 space-y-20">
         {sections.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-8xl mb-6">🎉</div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">
-              Microsite en construcción
-            </h2>
-            <p className="text-xl text-gray-600">
-              ¡Pronto estará listo para la despedida!
-            </p>
+          /* Contenido por defecto con información del evento */
+          <div className="space-y-16">
+            {/* Descripción del evento */}
+            {event.description && (
+              <section className="text-center">
+                <div className="bg-white rounded-3xl shadow-xl p-10 max-w-3xl mx-auto">
+                  <div className="text-5xl mb-6">📝</div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-6">Sobre el evento</h2>
+                  <p className="text-xl text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {event.description}
+                  </p>
+                </div>
+              </section>
+            )}
+
+            {/* Integrantes/Participantes */}
+            {participants && participants.length > 0 && (
+              <section className="text-center">
+                <h2 className="text-4xl font-bold text-gray-900 mb-12">
+                  🎭 Participantes
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {participants.map((participant, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all hover:scale-105"
+                    >
+                      <div
+                        className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold shadow-lg"
+                        style={{ backgroundColor: settings.primaryColor }}
+                      >
+                        {participant.name?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                      <h3 className="font-bold text-gray-900 text-lg mb-1">
+                        {participant.name}
+                      </h3>
+                      {participant.title && (
+                        <p className="text-sm text-gray-600">{participant.title}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Mensaje de personalización */}
+            <section className="text-center py-12">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-3xl p-10 max-w-3xl mx-auto border-2 border-purple-200">
+                <div className="text-5xl mb-4">✨</div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                  ¡Este microsite es personalizable!
+                </h3>
+                <p className="text-gray-700 text-lg">
+                  El organizador puede añadir más secciones, fotos, agenda, ubicación y mucho más desde el panel de control.
+                </p>
+              </div>
+            </section>
           </div>
         ) : (
           sections
@@ -233,6 +289,7 @@ function TextoSection({ section, primaryColor }: any) {
     </section>
   )
 }
+
 
 
 

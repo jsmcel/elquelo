@@ -3,6 +3,12 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "rewrites": [
+    {
+      "source": "/auth/callback",
+      "destination": "/api/auth/callback"
+    }
+  ]
 }
 
