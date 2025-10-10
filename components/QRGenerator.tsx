@@ -1144,6 +1144,9 @@ export function QRGenerator() {
                           </div>
                         ) : designState?.hasDesign ? (
                           <div className="flex flex-col gap-4 p-4 text-sm text-gray-600">
+                            {/* Lista de productos asociados */}
+                            <QRProductsList designData={designState.designData} />
+                            
                             {designState?.printfulSummary?.isPrintful ? (
                               <div className="flex flex-col gap-3">
                                 <div className="flex items-center gap-3">
