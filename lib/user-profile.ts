@@ -42,7 +42,9 @@ export function generateQrCodeValue(): string {
 
 export function buildDefaultDestination(): string {
   const base = getAppBaseUrl()
-  return `${base}/bienvenida`
+  // Los QR ahora deben tener un event_id y apuntar al microsite
+  // Esta función se mantiene como fallback para compatibilidad
+  return `${base}`
 }
 
 export function getAppBaseUrl(): string {
