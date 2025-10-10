@@ -14,16 +14,18 @@ import {
 } from 'lucide-react'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { CamisetaPackageButton } from '@/components/CamisetaPackageButton'
 
 interface Participant {
   id: string
   name: string
   email: string
   size: string
+  isNovioNovia: boolean
 }
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
-const STEPS = ['Despedida', 'Integrantes', 'Crear Grupo']
+const STEPS = ['Despedida', 'Integrantes', 'Paquetes', 'Crear Grupo']
 const FALLBACK_QR_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://elquelo.eu'
 
 const createParticipant = (): Participant => ({
@@ -31,6 +33,7 @@ const createParticipant = (): Participant => ({
   name: '',
   email: '',
   size: 'M',
+  isNovioNovia: false,
 })
 
 export default function ConfiguratorPage() {
@@ -41,13 +44,39 @@ export default function ConfiguratorPage() {
   const [groupName, setGroupName] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
+  const [camisetaPrice, setCamisetaPrice] = useState<number>(0) // Se carga de la API
 
   useEffect(() => {
     if (!loading && !user) {
         router.replace('/auth/login?redirect=/configurador')
       }
   }, [user, loading, router])
+
+  // Cargar precio real de la camiseta
+  useEffect(() => {
+    async function loadCamisetaPrice() {
+      try {
+        const response = await fetch('/api/printful/variants/price', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variantIds: [4013] })
+        })
+
+        if (response.ok) {
+          const { prices } = await response.json()
+          if (prices[4013]) {
+            setCamisetaPrice(prices[4013].finalPrice)
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando precio de camiseta:', error)
+      }
+    }
+
+    loadCamisetaPrice()
+  }, [])
 
   const addParticipant = () => {
     setParticipants(prev => [...prev, createParticipant()])
@@ -61,7 +90,7 @@ export default function ConfiguratorPage() {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
   }
 
-  const nextStep = () => setStep(prev => Math.min(prev + 1, 3))
+  const nextStep = () => setStep(prev => Math.min(prev + 1, 4))
   const previousStep = () => setStep(prev => Math.max(prev - 1, 1))
 
   const handleSaveGroup = async () => {
@@ -84,10 +113,14 @@ export default function ConfiguratorPage() {
         destination_url: FALLBACK_QR_URL,
         description: normalizedGroupName ? `Kit ${normalizedGroupName}` : 'Kit personalizado',
         group: normalizedGroupName || undefined,
+        selectedPackages: selectedPackages, // Enviar paquetes seleccionados
         members: participants.map((participant) => ({
           name: participant.name,
           title: normalizedGroupName ? `${normalizedGroupName} - ${participant.name}` : participant.name,
           destination_url: FALLBACK_QR_URL,
+          email: participant.email,
+          size: participant.size,
+          is_novio_novia: participant.isNovioNovia,
         })),
       }
 
@@ -214,17 +247,9 @@ export default function ConfiguratorPage() {
          {/* Step 2: Integrantes */}
          {step === 2 && (
            <section className="space-y-6 rounded-2xl border border-gray-200/50 bg-white p-8 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                 <h2 className="text-xl font-semibold text-gray-900">Integrantes del grupo</h2>
-                 <p className="text-sm text-gray-600">Añade los nombres de cada participante. Email y talla son opcionales.</p>
-              </div>
-              <button
-                onClick={addParticipant}
-                className="inline-flex items-center gap-2 rounded-full border border-primary-200 px-4 py-2 text-sm font-semibold text-primary-600 transition hover:border-primary-400"
-              >
-                <Plus className="h-4 w-4" /> Añadir integrante
-              </button>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Integrantes del grupo</h2>
+              <p className="text-sm text-gray-600">Añade los nombres de cada participante. Email y talla son opcionales.</p>
             </div>
 
              {participants.length === 0 ? (
@@ -236,7 +261,7 @@ export default function ConfiguratorPage() {
                  {participants.map((participant) => (
                    <div key={participant.id} className="rounded-2xl border border-gray-200/40 bg-gray-50/50 p-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="grid flex-1 gap-4 sm:grid-cols-3">
+                      <div className="grid flex-1 gap-4 sm:grid-cols-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium text-gray-700">Nombre</label>
                           <input
@@ -271,6 +296,21 @@ export default function ConfiguratorPage() {
                             ))}
                           </select>
                         </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Rol</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`novio-novia-${participant.id}`}
+                              checked={participant.isNovioNovia}
+                              onChange={(event) => updateParticipant(participant.id, { isNovioNovia: event.target.checked })}
+                              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <label htmlFor={`novio-novia-${participant.id}`} className="text-sm text-gray-700">
+                              💍 Novio/Novia
+                            </label>
+                          </div>
+                        </div>
                       </div>
 
                       <button
@@ -293,10 +333,215 @@ export default function ConfiguratorPage() {
               >
                 <ArrowLeft className="h-4 w-4" /> Anterior
               </button>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={addParticipant}
+                  className="inline-flex items-center gap-2 rounded-full border border-primary-200 px-4 py-2 text-sm font-semibold text-primary-600 transition hover:border-primary-400"
+                >
+                  <Plus className="h-4 w-4" /> Añadir integrante
+                </button>
+                
+                <button
+                  onClick={nextStep}
+                  disabled={participants.length === 0}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Siguiente <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+         {/* Step 3: Paquetes */}
+         {step === 3 && (
+           <section className="space-y-6 rounded-2xl border border-gray-200/50 bg-white p-8 shadow-sm">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-900">Selecciona Paquetes</h2>
+              <p className="text-sm text-gray-600">Elige los paquetes que quieres incluir en tu despedida.</p>
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Todo es configurable:</strong> Los paquetes son solo una base. Después podrás personalizar tallas, colores, diseños y añadir/quitar productos individualmente.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Paquete: Camisetas para todos */}
+              <div className={`rounded-2xl border-2 p-6 cursor-pointer transition-all ${
+                selectedPackages.includes('camisetas') 
+                  ? 'border-orange-300 bg-orange-50' 
+                  : 'border-gray-200 bg-white hover:border-orange-200'
+              }`} onClick={() => {
+                if (selectedPackages.includes('camisetas')) {
+                  setSelectedPackages(prev => prev.filter(p => p !== 'camisetas'))
+                } else {
+                  setSelectedPackages(prev => [...prev, 'camisetas'])
+                }
+              }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedPackages.includes('camisetas')}
+                    onChange={() => {}}
+                    className="h-5 w-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-900">🎉 ¡HAY CAMISETAS PARA TODOS!</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Camiseta con QR personalizado para cada participante
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  ✨ Personalizable: tallas, colores, diseños
+                </p>
+                <div className="text-lg font-bold text-orange-600">
+                  {camisetaPrice > 0 ? `€${Math.round(participants.length * camisetaPrice * 100) / 100}` : 'Cargando precio...'}
+                </div>
+              </div>
+
+              {/* Paquete: Por si refresca - PRÓXIMAMENTE */}
+              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    disabled
+                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-500">🥤 Por si refresca</h3>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
+                </div>
+                <p className="text-sm text-gray-500 mb-3">
+                  Botellas de agua personalizadas para la despedida
+                </p>
+                <p className="text-xs text-gray-400 mb-2">
+                  ✨ Personalizable: colores, diseños, cantidades
+                </p>
+                <div className="text-lg font-bold text-gray-400">
+                  Precio por calcular
+                </div>
+              </div>
+
+              {/* Paquete: Gadgets para novio/novia - PRÓXIMAMENTE */}
+              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    disabled
+                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-500">💍 Gadgets para Novios</h3>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
+                </div>
+                <p className="text-sm text-gray-500 mb-3">
+                  Regalos especiales solo para los novios/novias
+                </p>
+                <p className="text-xs text-gray-400 mb-2">
+                  ✨ Personalizable: productos, diseños, cantidades
+                </p>
+                <div className="text-lg font-bold text-gray-400">
+                  Precio por calcular
+                </div>
+              </div>
+
+              {/* Paquete: Para ellas - PRÓXIMAMENTE */}
+              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    disabled
+                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-500">👗 Para ellas</h3>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
+                </div>
+                <p className="text-sm text-gray-500 mb-3">
+                  Productos especiales para las chicas de la despedida
+                </p>
+                <p className="text-xs text-gray-400 mb-2">
+                  ✨ Personalizable: productos, tallas, colores
+                </p>
+                <div className="text-lg font-bold text-gray-400">
+                  Precio por calcular
+                </div>
+              </div>
+
+              {/* Paquete: Sexy - PRÓXIMAMENTE */}
+              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    disabled
+                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-500">🔥 Sexy</h3>
+                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
+                </div>
+                <p className="text-sm text-gray-500 mb-3">
+                  Productos atrevidos para la despedida
+                </p>
+                <p className="text-xs text-gray-400 mb-2">
+                  ✨ Personalizable: productos, tallas, colores
+                </p>
+                <div className="text-lg font-bold text-gray-400">
+                  Precio por calcular
+                </div>
+              </div>
+
+              {/* Ningún paquete */}
+              <div className={`rounded-2xl border-2 p-6 cursor-pointer transition-all ${
+                selectedPackages.length === 0
+                  ? 'border-gray-400 bg-gray-100' 
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`} onClick={() => {
+                setSelectedPackages([])
+              }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedPackages.length === 0}
+                    onChange={() => {}}
+                    className="h-5 w-5 rounded border-gray-300 text-gray-600 focus:ring-gray-500"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-900">🚫 Ningún paquete</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Solo crear el grupo, sin paquetes adicionales
+                </p>
+                <div className="text-lg font-bold text-gray-600">
+                  €0.00
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-yellow-600 text-lg">⚠️</div>
+                <div>
+                  <h4 className="text-sm font-semibold text-yellow-800 mb-1">Importante</h4>
+                  <p className="text-sm text-yellow-700">
+                    Los paquetes son solo una <strong>base inicial</strong>. Una vez creado el grupo, podrás:
+                  </p>
+                  <ul className="text-sm text-yellow-700 mt-2 space-y-1">
+                    <li>• Cambiar tallas y colores de cada producto</li>
+                    <li>• Añadir o quitar productos individualmente</li>
+                    <li>• Personalizar diseños y textos</li>
+                    <li>• Modificar cantidades</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={previousStep}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300"
+              >
+                <ArrowLeft className="h-4 w-4" /> Anterior
+              </button>
               <button
                 onClick={nextStep}
-                disabled={participants.length === 0}
-                className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
               >
                 Siguiente <ArrowRight className="h-4 w-4" />
               </button>
@@ -304,8 +549,8 @@ export default function ConfiguratorPage() {
           </section>
         )}
 
-         {/* Step 3: Crear Grupo */}
-         {step === 3 && (
+         {/* Step 4: Crear Grupo */}
+         {step === 4 && (
            <section className="space-y-6 rounded-2xl border border-gray-200/50 bg-white p-8 shadow-sm">
             <div className="text-center">
               <h2 className="text-xl font-semibold text-gray-900">Crear Grupo</h2>
@@ -333,6 +578,9 @@ export default function ConfiguratorPage() {
                      </div>
                      <div className="text-sm text-gray-500">
                        {participant.size && `Talla: ${participant.size}`}
+                       {participant.isNovioNovia && (
+                         <span className="ml-2 text-pink-600 font-medium">💍 Novio/Novia</span>
+                       )}
                      </div>
               </div>
                 ))}
@@ -360,6 +608,7 @@ export default function ConfiguratorPage() {
                     Después de crear el grupo, podrás diseñar las camisetas en el dashboard.
                   </p>
                 </div>
+
 
                 <div className="flex items-center justify-between">
                   <button

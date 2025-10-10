@@ -1279,16 +1279,35 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
     let nextSize = ''
     let nextColorCode = ''
-    if (foundVariant) {
+    
+    // Priorizar las tallas guardadas en savedDesignData
+    if (matchesSavedProduct && savedPrintful?.size) {
+      nextSize = savedPrintful.size
+    }
+    if (matchesSavedProduct && savedPrintful?.colorCode) {
+      nextColorCode = savedPrintful.colorCode
+    }
+    
+    // Si no hay tallas guardadas, usar las del variant encontrado
+    if (!nextSize && foundVariant) {
       nextSize = foundVariant.size
+    }
+    if (!nextColorCode && foundVariant) {
       nextColorCode = foundVariant.colorCode
-    } else if (productData.variants[0]) {
+    }
+    
+    // Fallback a la primera variante
+    if (!nextSize && productData.variants[0]) {
       nextVariantId = productData.variants[0].id
       nextSize = productData.variants[0].size
+    }
+    if (!nextColorCode && productData.variants[0]) {
       nextColorCode = productData.variants[0].colorCode
-    } else {
+    }
+    
+    // Último fallback
+    if (!nextSize) {
       nextSize = productData.sizes[0] ?? ''
-      nextColorCode = ''
     }
 
     let nextActivePlacement = 'front'

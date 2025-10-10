@@ -9,6 +9,7 @@ import { QRDesignData as QRDesignDataType, migrateLegacyDesign } from '@/types/q
 interface ConfirmOrderButtonProps {
   qrCodes: string[]
   className?: string
+  refreshKey?: number // Para forzar recarga de precios
 }
 
 interface ProductItem {
@@ -19,7 +20,7 @@ interface ProductItem {
   price: number
 }
 
-export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButtonProps) {
+export function ConfirmOrderButton({ qrCodes, className = '', refreshKey = 0 }: ConfirmOrderButtonProps) {
   const { user } = useUser()
   const [confirming, setConfirming] = useState(false)
   const [loadingPrices, setLoadingPrices] = useState(true)
@@ -64,10 +65,10 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
           // Migrar a nuevo formato si es necesario
           const migratedDesign = migrateLegacyDesign(designData)
           
-          // Extraer productos
+          // Extraer productos (solo los activos, no los de la papelera)
           if (migratedDesign.products && migratedDesign.products.length > 0) {
             migratedDesign.products.forEach(product => {
-              if (product.variantId) {
+              if (product.variantId && !product.deletedAt) {
                 allProducts.push({
                   qrCode: code,
                   productId: product.id,
@@ -79,24 +80,18 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
           }
         })
 
+        // Si no hay productos activos, no mostrar el componente
         if (allProducts.length === 0) {
-          // Si no hay productos, usar precio por defecto por QR
-          const defaultItems: ProductItem[] = qrCodes.map(code => ({
-            qrCode: code,
-            productId: `default-${code}`,
-            variantId: 0,
-            productName: 'Producto personalizado',
-            price: 29
-          }))
-          setProductItems(defaultItems)
-          setTotalProducts(qrCodes.length)
-          setTotalPrice(qrCodes.length * 29)
+          setProductItems([])
+          setTotalProducts(0)
+          setTotalPrice(0)
           setLoadingPrices(false)
           return
         }
 
         // Extraer todos los variantIds únicos
-        const variantIds = [...new Set(allProducts.map(p => p.variantId))]
+        const uniqueVariantIds = new Set(allProducts.map(p => p.variantId))
+        const variantIds = Array.from(uniqueVariantIds)
 
         // Obtener precios de las variantes
         const priceResponse = await fetch('/api/printful/variants/price', {
@@ -150,7 +145,7 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
     }
 
     loadDesignsAndPrices()
-  }, [user, qrCodes])
+  }, [user, qrCodes, refreshKey])
 
   const handleConfirmOrder = async () => {
     if (!user) {
@@ -203,7 +198,7 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
     }
   }
 
-  if (qrCodes.length === 0) {
+  if (qrCodes.length === 0 || totalProducts === 0) {
     return null
   }
 

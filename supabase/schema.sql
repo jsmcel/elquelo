@@ -77,6 +77,18 @@ CREATE TABLE IF NOT EXISTS public.group_members (
   UNIQUE(group_id, user_id)
 );
 
+-- Participants table (for configurator)
+CREATE TABLE IF NOT EXISTS public.participants (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT,
+  size TEXT DEFAULT 'M',
+  is_novio_novia BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- QR codes table
 CREATE TABLE IF NOT EXISTS public.qrs (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -178,6 +190,7 @@ CREATE TABLE IF NOT EXISTS public.qr_designs (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
@@ -187,6 +200,7 @@ CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON public.order_items(prod
 CREATE INDEX IF NOT EXISTS idx_qrs_user_id ON public.qrs(user_id);
 CREATE INDEX IF NOT EXISTS idx_qrs_group_id ON public.qrs(group_id);
 CREATE INDEX IF NOT EXISTS idx_qrs_code ON public.qrs(code);
+CREATE INDEX IF NOT EXISTS idx_participants_group_id ON public.participants(group_id);
 CREATE INDEX IF NOT EXISTS idx_scans_qr_id ON public.scans(qr_id);
 CREATE INDEX IF NOT EXISTS idx_scans_created_at ON public.scans(created_at);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions(user_id);
@@ -201,6 +215,7 @@ ALTER TABLE public.scans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see their own data
 DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
@@ -251,6 +266,7 @@ CREATE POLICY "Users can update own QRs" ON public.qrs
       AND role = 'admin'
     )
   );
+
 
 -- Scans are public (for analytics)
 DROP POLICY IF EXISTS "Scans are viewable by QR owner" ON public.scans;
@@ -318,6 +334,28 @@ CREATE POLICY "Group admins can manage members" ON public.group_members
     )
   );
 
+-- Participants policies
+DROP POLICY IF EXISTS "Group members can view participants" ON public.participants;
+CREATE POLICY "Group members can view participants" ON public.participants
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.group_members
+      WHERE group_id = participants.group_id
+      AND user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Group admins can manage participants" ON public.participants;
+CREATE POLICY "Group admins can manage participants" ON public.participants
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.group_members
+      WHERE group_id = participants.group_id
+      AND user_id = auth.uid()
+      AND role = 'admin'
+    )
+  );
+
 -- Public read access for products, events, offers
 DROP POLICY IF EXISTS "Products are publicly readable" ON public.products;
 CREATE POLICY "Products are publicly readable" ON public.products
@@ -372,3 +410,8 @@ CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON public.events
 DROP TRIGGER IF EXISTS update_offers_updated_at ON public.offers;
 CREATE TRIGGER update_offers_updated_at BEFORE UPDATE ON public.offers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_participants_updated_at ON public.participants;
+CREATE TRIGGER update_participants_updated_at BEFORE UPDATE ON public.participants
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+

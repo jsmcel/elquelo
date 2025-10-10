@@ -12,10 +12,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's QRs
+    // Get user's QRs with designs
     const { data: qrs, error } = await supabase
       .from('qrs')
-      .select('*')
+      .select(`
+        *,
+        qr_designs (
+          id,
+          design_data,
+          product_size,
+          product_color,
+          product_gender,
+          created_at
+        )
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -23,10 +33,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch QRs' }, { status: 500 })
     }
 
-    // Add QR URLs
+    // Add QR URLs and process design data
     const qrsWithUrls = qrs.map(qr => ({
       ...qr,
       qr_url: `${process.env.QR_DOMAIN}/${qr.code}`,
+      designs: qr.qr_designs || [],
     }))
 
     return NextResponse.json({ qrs: qrsWithUrls })

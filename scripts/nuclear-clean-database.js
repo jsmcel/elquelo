@@ -59,7 +59,7 @@ async function nuclearCleanDatabase() {
     const { error: deleteQRError } = await supabase
       .from('qrs')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteQRError) {
       console.error('❌ Error eliminando QRs:', deleteQRError)
@@ -72,7 +72,7 @@ async function nuclearCleanDatabase() {
     const { error: deleteGroupsError } = await supabase
       .from('groups')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteGroupsError) {
       console.error('❌ Error eliminando grupos:', deleteGroupsError)
@@ -85,7 +85,7 @@ async function nuclearCleanDatabase() {
     const { error: deleteMembersError } = await supabase
       .from('group_members')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteMembersError) {
       console.error('❌ Error eliminando miembros:', deleteMembersError)
@@ -98,7 +98,7 @@ async function nuclearCleanDatabase() {
     const { error: deleteOrdersError } = await supabase
       .from('orders')
       .delete()
-      .neq('id', '')
+      .not('id', 'is', null)
     
     if (deleteOrdersError) {
       console.error('❌ Error eliminando órdenes:', deleteOrdersError)
@@ -106,17 +106,21 @@ async function nuclearCleanDatabase() {
       console.log('✅ Todas las órdenes eliminadas')
     }
     
-    // 6. Eliminar TODOS los NFTs
+    // 6. Eliminar TODOS los NFTs (si la tabla existe)
     console.log('🗑️  Eliminando TODOS los NFTs...')
-    const { error: deleteNFTsError } = await supabase
-      .from('nfts')
-      .delete()
-      .neq('id', '')
-    
-    if (deleteNFTsError) {
-      console.error('❌ Error eliminando NFTs:', deleteNFTsError)
-    } else {
-      console.log('✅ Todos los NFTs eliminados')
+    try {
+      const { error: deleteNFTsError } = await supabase
+        .from('nfts')
+        .delete()
+        .not('id', 'is', null)
+      
+      if (deleteNFTsError) {
+        console.log('ℹ️  Tabla NFTs no existe o ya está vacía')
+      } else {
+        console.log('✅ Todos los NFTs eliminados')
+      }
+    } catch (error) {
+      console.log('ℹ️  Tabla NFTs no existe')
     }
     
     // 7. Limpiar TODOS los buckets de storage
@@ -168,19 +172,27 @@ async function nuclearCleanDatabase() {
       { name: 'grupos', table: 'groups' },
       { name: 'miembros', table: 'group_members' },
       { name: 'órdenes', table: 'orders' },
-      { name: 'NFTs', table: 'nfts' }
+      { name: 'NFTs', table: 'nfts', optional: true }
     ]
     
-    for (const { name, table } of tablesToCheck) {
+    for (const { name, table, optional } of tablesToCheck) {
       try {
         const { data, error } = await supabase.from(table).select('*', { count: 'exact' })
         if (error) {
-          console.log(`❌ Error verificando ${name}: ${error.message}`)
+          if (optional) {
+            console.log(`ℹ️  ${name}: tabla no existe`)
+          } else {
+            console.log(`❌ Error verificando ${name}: ${error.message}`)
+          }
         } else {
           console.log(`📊 ${name} restantes: ${data?.length || 0}`)
         }
       } catch (err) {
-        console.log(`❌ Error verificando ${name}: ${err.message}`)
+        if (optional) {
+          console.log(`ℹ️  ${name}: tabla no existe`)
+        } else {
+          console.log(`❌ Error verificando ${name}: ${err.message}`)
+        }
       }
     }
     

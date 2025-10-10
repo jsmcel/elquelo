@@ -194,7 +194,11 @@ function buildDesignStateEntry(designData: any, url?: string) {
 
 const FALLBACK_DESTINATION = 'https://elquelo.com/despedida'
 
-export function QRGenerator() {
+interface QRGeneratorProps {
+  onDesignChanged?: () => void
+}
+
+export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const { user } = useUser()
   const [defaultDestination, setDefaultDestination] = useState(FALLBACK_DESTINATION)
   const previousDefaultRef = useRef(FALLBACK_DESTINATION)
@@ -228,6 +232,9 @@ export function QRGenerator() {
   const [sourceDesign, setSourceDesign] = useState<{ code: string; designData: any } | null>(null)
   const [selectedTargetQRs, setSelectedTargetQRs] = useState<string[]>([])
   const [copyingDesign, setCopyingDesign] = useState(false)
+  const [productTrashOpen, setProductTrashOpen] = useState(false)
+  const [trashQRCode, setTrashQRCode] = useState<string | null>(null)
+  const [priceRefreshKey, setPriceRefreshKey] = useState(0)
 
   useEffect(() => {
     if (!user) {
@@ -643,12 +650,33 @@ export function QRGenerator() {
       )
 
       const copyPromises = targetQRs.map(async (targetQR) => {
+        // Obtener el diseño actual del QR destino para mantener sus tallas
+        const targetResponse = await fetch(`/api/design/${targetQR.code}`)
+        const targetDesignData = targetResponse.ok ? (await targetResponse.json()).designData : null
+        
         const clonedDesign = JSON.parse(JSON.stringify(sourceDesign.designData || {}))
         clonedDesign.qrCode = targetQR.code
         clonedDesign.copiedFrom = sourceDesign.code
         clonedDesign.copiedAt = new Date().toISOString()
         clonedDesign.targetQRCode = targetQR.code
         clonedDesign.targetQRUrl = targetQR.destination_url
+        
+        // Mantener las tallas preexistentes del QR destino
+        if (targetDesignData && clonedDesign.products) {
+          const migratedTarget = migrateLegacyDesign(targetDesignData)
+          if (migratedTarget.products && migratedTarget.products.length > 0) {
+            // Usar las tallas del QR destino para cada producto
+            clonedDesign.products.forEach((product: any, index: number) => {
+              const targetProduct = migratedTarget.products[index]
+              if (targetProduct) {
+                product.size = targetProduct.size || 'M'
+                product.color = targetProduct.color || 'White'
+                product.variantId = targetProduct.variantId || product.variantId
+                product.colorCode = targetProduct.colorCode || product.colorCode
+              }
+            })
+          }
+        }
         
         // Regenerar archivos de QR para el nuevo QR
         console.log(`Regenerando QR files para ${targetQR.code}...`)
@@ -799,6 +827,9 @@ export function QRGenerator() {
           },
         }
       })
+      
+      // Notificar cambio de diseño para actualizar precios
+      onDesignChanged?.()
     } catch (error) {
       console.error('Error uploading design:', error)
       setDesigns((prev) => ({
@@ -1170,7 +1201,29 @@ export function QRGenerator() {
                         ) : designState?.hasDesign ? (
                           <div className="flex flex-col gap-4 p-4 text-sm text-gray-600">
                             {/* Lista de productos asociados */}
-                            <QRProductsList designData={designState.designData} />
+                            <QRProductsList 
+                              designData={designState.designData}
+                              onAddProduct={() => {
+                                setEditingQR(qr)
+                                setEditorOpen(true)
+                              }}
+                              onOpenTrash={() => {
+                                setTrashQRCode(qr.code)
+                                setProductTrashOpen(true)
+                              }}
+                              onDeleteProduct={async (productId) => {
+                                // Marcar producto como eliminado
+                                const currentDesign = designState.designData
+                                if (currentDesign?.products) {
+                                  const updatedProducts = currentDesign.products.map((p: any) =>
+                                    p.id === productId ? { ...p, deletedAt: new Date().toISOString() } : p
+                                  )
+                                  const updatedDesign = { ...currentDesign, products: updatedProducts }
+                                  await uploadDesignToServer(qr.code, updatedDesign)
+                                  toast.success('Producto movido a la papelera')
+                                }
+                              }}
+                            />
                             
                             {designState?.printfulSummary?.isPrintful ? (
                               <div className="flex flex-col gap-3">
@@ -1444,6 +1497,111 @@ export function QRGenerator() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Papelera de Productos */}
+      {productTrashOpen && trashQRCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Trash2 className="h-6 w-6 text-gray-700" />
+                <h2 className="text-2xl font-bold text-gray-900">Papelera de Productos</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setProductTrashOpen(false)
+                  setTrashQRCode(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {(() => {
+              const designState = designs[trashQRCode]
+              const currentDesign = designState?.designData
+              const trashedProducts = currentDesign?.products?.filter((p: any) => p.deletedAt) || []
+
+              return trashedProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Trash2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">La papelera está vacía</h3>
+                  <p className="text-gray-600">Los productos eliminados aparecerán aquí</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {trashedProducts.map((product: any) => (
+                    <div key={product.id} className="flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 bg-gray-50">
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">{product.productName}</div>
+                        <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                          {product.size && (
+                            <span className="px-2 py-0.5 bg-white rounded border border-gray-200">
+                              {product.size}
+                            </span>
+                          )}
+                          {product.color && (
+                            <span className="flex items-center gap-1">
+                              {product.colorCode && (
+                                <span
+                                  className="w-3 h-3 rounded-full border border-gray-300"
+                                  style={{ backgroundColor: product.colorCode }}
+                                />
+                              )}
+                              {product.color}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Eliminado: {new Date(product.deletedAt).toLocaleString('es-ES')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <button
+                          onClick={async () => {
+                            // Restaurar producto
+                            const updatedProducts = currentDesign.products.map((p: any) =>
+                              p.id === product.id ? { ...p, deletedAt: null } : p
+                            )
+                            const updatedDesign = { ...currentDesign, products: updatedProducts }
+                            await uploadDesignToServer(trashQRCode, updatedDesign)
+                            toast.success('Producto restaurado')
+                          }}
+                          className="px-3 py-1.5 text-sm font-semibold text-green-600 border-2 border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+                        >
+                          Restaurar
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('¿Eliminar permanentemente este producto? Esta acción no se puede deshacer.')) {
+                              // Eliminar permanentemente
+                              const updatedProducts = currentDesign.products.filter((p: any) => p.id !== product.id)
+                              const updatedDesign = { ...currentDesign, products: updatedProducts }
+                              await uploadDesignToServer(trashQRCode, updatedDesign)
+                              toast.success('Producto eliminado permanentemente')
+                              
+                              // Si no quedan productos en la papelera, cerrar el modal
+                              const remainingTrashed = updatedProducts.filter((p: any) => p.deletedAt)
+                              if (remainingTrashed.length === 0) {
+                                setProductTrashOpen(false)
+                                setTrashQRCode(null)
+                              }
+                            }
+                          }}
+                          className="px-3 py-1.5 text-sm font-semibold text-red-600 border-2 border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

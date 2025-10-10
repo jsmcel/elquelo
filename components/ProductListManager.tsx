@@ -10,6 +10,7 @@ interface ProductListManagerProps {
   onSelectProduct: (productId: string) => void
   onAddProduct: () => void
   onDeleteProduct: (productId: string) => void
+  onEditProduct?: (productId: string) => void
 }
 
 export function ProductListManager({
@@ -17,8 +18,11 @@ export function ProductListManager({
   selectedProductId,
   onSelectProduct,
   onAddProduct,
-  onDeleteProduct
+  onDeleteProduct,
+  onEditProduct
 }: ProductListManagerProps) {
+  const [lastClickTime, setLastClickTime] = useState(0)
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null)
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
@@ -46,11 +50,28 @@ export function ProductListManager({
           products.map((product) => (
             <div
               key={product.id}
-              onClick={() => onSelectProduct(product.id)}
+              onClick={() => {
+                const now = Date.now()
+                const isDoubleClick = 
+                  lastClickedId === product.id && 
+                  now - lastClickTime < 300 // 300ms ventana para doble click
+                
+                if (isDoubleClick && onEditProduct) {
+                  // Doble click: abrir editor
+                  onEditProduct(product.id)
+                  setLastClickTime(0)
+                  setLastClickedId(null)
+                } else {
+                  // Click simple: solo seleccionar
+                  onSelectProduct(product.id)
+                  setLastClickTime(now)
+                  setLastClickedId(product.id)
+                }
+              }}
               className={`relative p-3 border rounded-lg cursor-pointer transition-all ${
                 selectedProductId === product.id
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-primary-500 bg-primary-50 shadow-sm'
+                  : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
               }`}
             >
               <div className="flex items-start justify-between">

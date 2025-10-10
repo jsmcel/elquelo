@@ -34,12 +34,23 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
     const designData = designRows?.[0]
 
     if (designData?.design_data) {
+      // Parse design_data if it's a string
+      let parsedDesignData = designData.design_data
+      if (typeof parsedDesignData === 'string') {
+        try {
+          parsedDesignData = JSON.parse(parsedDesignData)
+        } catch (error) {
+          console.error('Error parsing design_data:', error)
+          parsedDesignData = {}
+        }
+      }
+
       return NextResponse.json({
         success: true,
         hasDesign: true,
         url: 'design-saved',
         designData: {
-          ...designData.design_data,
+          ...parsedDesignData,
           productOptions: {
             size: designData.product_size,
             color: designData.product_color,

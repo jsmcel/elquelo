@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [checkingQRs, setCheckingQRs] = useState(true)
   const [userQRs, setUserQRs] = useState<any[]>([])
+  const [priceRefreshKey, setPriceRefreshKey] = useState(0)
   const supabase = createClientComponentClient()
 
   useEffect(() => {
@@ -75,7 +76,10 @@ export default function DashboardPage() {
         {/* Confirm Order - Prominent Position */}
         {userQRs.length > 0 && (
           <div className="mb-8">
-            <ConfirmOrderButton qrCodes={userQRs.map(qr => qr.code)} />
+            <ConfirmOrderButton 
+              qrCodes={userQRs.map(qr => qr.code)} 
+              refreshKey={priceRefreshKey}
+            />
           </div>
         )}
 
@@ -83,7 +87,7 @@ export default function DashboardPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
             <DashboardStats />
-            <QRGenerator />
+            <QRGenerator onDesignChanged={() => setPriceRefreshKey(prev => prev + 1)} />
             <OrderStatus />
           </div>
 

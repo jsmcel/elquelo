@@ -5,7 +5,7 @@ import { PrintfulDesignEditor } from './PrintfulDesignEditor'
 import { ProductListManager } from './ProductListManager'
 import { QRProduct, QRDesignData, migrateLegacyDesign } from '@/types/qr-product'
 import { toast } from 'react-hot-toast'
-import { X } from 'lucide-react'
+import { X, Edit2, Image as ImageIcon } from 'lucide-react'
 
 interface MultiProductDesignEditorProps {
   qrCode: string
@@ -33,6 +33,7 @@ export function MultiProductDesignEditor({
   )
   const [editingProduct, setEditingProduct] = useState<QRProduct | null>(null)
   const [showEditor, setShowEditor] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Obtener el producto seleccionado actualmente
   const selectedProduct = products.find(p => p.id === selectedProductId) || null
@@ -69,6 +70,14 @@ export function MultiProductDesignEditor({
   }
 
   const handleSelectProduct = (productId: string) => {
+    // Solo seleccionar para mostrar vista previa
+    setSelectedProductId(productId)
+    setShowEditor(false)
+    setEditingProduct(null)
+  }
+
+  const handleEditProduct = (productId: string) => {
+    // Abrir editor para editar el producto
     const product = products.find(p => p.id === productId)
     if (product) {
       setSelectedProductId(productId)
@@ -87,12 +96,12 @@ export function MultiProductDesignEditor({
       templateId: designData?.templateId || designData?.printfulProduct?.templateId || 71,
       variantId: designData?.printfulProduct?.variantId || designData?.printful?.variantId || 0,
       productName: designData?.productName || designData?.printfulProduct?.name || 'Producto',
-      size: designData?.printful?.size || designData?.printfulProduct?.size || null,
-      color: designData?.printful?.color || designData?.printfulProduct?.color || null,
-      colorCode: designData?.printful?.colorCode || designData?.printfulProduct?.colorCode || null,
-      designsByPlacement: designData?.designsByPlacement || designData?.printful?.placements || {},
-      designMetadata: designData?.designMetadata || designData?.printful?.designMetadata || {},
-      variantMockups: designData?.variantMockups || designData?.printful?.variantMockups || {},
+      size: designData?.printful?.size || designData?.printfulProduct?.size || editingProduct?.size || null,
+      color: designData?.printful?.color || designData?.printfulProduct?.color || editingProduct?.color || null,
+      colorCode: designData?.printful?.colorCode || designData?.printfulProduct?.colorCode || editingProduct?.colorCode || null,
+      designsByPlacement: editingProduct?.designsByPlacement || designData?.designsByPlacement || designData?.printful?.placements || {},
+      designMetadata: editingProduct?.designMetadata || designData?.designMetadata || designData?.printful?.designMetadata || {},
+      variantMockups: editingProduct?.variantMockups || designData?.variantMockups || designData?.printful?.variantMockups || {},
       createdAt: editingProduct?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -123,7 +132,7 @@ export function MultiProductDesignEditor({
     toast.success('Producto guardado')
   }
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     if (products.length === 0) {
       toast.error('Debes agregar al menos un producto')
       return
@@ -136,14 +145,23 @@ export function MultiProductDesignEditor({
       return
     }
 
-    const finalDesign: QRDesignData = {
-      version: '2.0',
-      products,
-      qrCode,
-      lastUpdated: new Date().toISOString()
-    }
+    setSaving(true)
+    try {
+      const finalDesign: QRDesignData = {
+        version: '2.0',
+        products,
+        qrCode,
+        lastUpdated: new Date().toISOString()
+      }
 
-    onSave(finalDesign)
+      await onSave(finalDesign)
+      toast.success('Diseño guardado correctamente')
+    } catch (error) {
+      console.error('Error saving design:', error)
+      toast.error('Error al guardar el diseño')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -177,6 +195,7 @@ export function MultiProductDesignEditor({
               onSelectProduct={handleSelectProduct}
               onAddProduct={handleAddProduct}
               onDeleteProduct={handleDeleteProduct}
+              onEditProduct={handleEditProduct}
             />
           </div>
 
@@ -192,31 +211,111 @@ export function MultiProductDesignEditor({
                     setShowEditor(false)
                     setEditingProduct(null)
                   }}
-                  savedDesignData={
-                    editingProduct.variantId
-                      ? {
-                          printfulProduct: {
-                            productId: editingProduct.productId,
-                            templateId: editingProduct.templateId,
-                            variantId: editingProduct.variantId,
-                            name: editingProduct.productName
-                          },
-                          printful: {
-                            variantId: editingProduct.variantId,
-                            size: editingProduct.size,
-                            color: editingProduct.color,
-                            colorCode: editingProduct.colorCode,
-                            placements: editingProduct.designsByPlacement,
-                            designMetadata: editingProduct.designMetadata,
-                            variantMockups: editingProduct.variantMockups
-                          },
-                          designsByPlacement: editingProduct.designsByPlacement,
-                          designMetadata: editingProduct.designMetadata,
-                          variantMockups: editingProduct.variantMockups
-                        }
-                      : undefined
-                  }
+                  savedDesignData={{
+                    printfulProduct: {
+                      productId: editingProduct.productId,
+                      templateId: editingProduct.templateId,
+                      variantId: editingProduct.variantId || 0,
+                      name: editingProduct.productName
+                    },
+                    printful: {
+                      variantId: editingProduct.variantId || 0,
+                      size: editingProduct.size,
+                      color: editingProduct.color,
+                      colorCode: editingProduct.colorCode,
+                      placements: editingProduct.designsByPlacement,
+                      designMetadata: editingProduct.designMetadata,
+                      variantMockups: editingProduct.variantMockups
+                    },
+                    designsByPlacement: editingProduct.designsByPlacement,
+                    designMetadata: editingProduct.designMetadata,
+                    variantMockups: editingProduct.variantMockups
+                  }}
                 />
+              </div>
+            ) : selectedProduct ? (
+              <div className="w-full h-full p-8 overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
+                  <div className="mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900">{selectedProduct.productName}</h3>
+                    <div className="flex items-center gap-3 mt-2">
+                      {selectedProduct.size && (
+                        <span className="px-3 py-1 bg-gray-100 rounded-lg text-sm font-medium text-gray-700">
+                          {selectedProduct.size}
+                        </span>
+                      )}
+                      {selectedProduct.color && (
+                        <span className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-lg text-sm font-medium text-gray-700">
+                          {selectedProduct.colorCode && (
+                            <span
+                              className="w-4 h-4 rounded-full border border-gray-300"
+                              style={{ backgroundColor: selectedProduct.colorCode }}
+                            />
+                          )}
+                          {selectedProduct.color}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mockups */}
+                  {selectedProduct.variantMockups && Object.keys(selectedProduct.variantMockups).length > 0 ? (
+                    <div className="space-y-6">
+                      <h4 className="text-lg font-semibold text-gray-900">Mockups</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {Object.entries(selectedProduct.variantMockups).map(([variantId, mockupsByPlacement]: [string, any]) => (
+                          Object.entries(mockupsByPlacement).map(([placement, mockup]: [string, any]) => (
+                            <div key={`${variantId}-${placement}`} className="space-y-2">
+                              <p className="text-sm font-medium text-gray-700 capitalize">{placement}</p>
+                              <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border-2 border-gray-200">
+                                <img
+                                  src={mockup.url}
+                                  alt={`${placement} mockup`}
+                                  className="w-full h-full object-contain"
+                                />
+                              </div>
+                            </div>
+                          ))
+                        ))}
+                      </div>
+                    </div>
+                  ) : selectedProduct.designsByPlacement && Object.keys(selectedProduct.designsByPlacement).length > 0 ? (
+                    <div className="space-y-6">
+                      <h4 className="text-lg font-semibold text-gray-900">Diseños</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {Object.entries(selectedProduct.designsByPlacement).map(([placement, imageUrl]: [string, any]) => (
+                          <div key={placement} className="space-y-2">
+                            <p className="text-sm font-medium text-gray-700 capitalize">{placement}</p>
+                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border-2 border-gray-200">
+                              <img
+                                src={imageUrl}
+                                alt={`${placement} design`}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <ImageIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg mb-2">Sin diseño todavía</p>
+                      <p className="text-sm">Haz clic en el producto para editarlo</p>
+                    </div>
+                  )}
+
+                  {/* Botón de editar */}
+                  <div className="mt-8 flex justify-center">
+                    <button
+                      onClick={() => handleEditProduct(selectedProduct.id)}
+                      className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center gap-2"
+                    >
+                      <Edit2 className="h-5 w-5" />
+                      Editar Diseño
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center text-gray-500">
@@ -241,10 +340,17 @@ export function MultiProductDesignEditor({
             </button>
             <button
               onClick={handleSaveAll}
-              disabled={products.length === 0}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={products.length === 0 || saving}
+              className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
-              Guardar Todo
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Guardando...
+                </>
+              ) : (
+                'Guardar Todo'
+              )}
             </button>
           </div>
         </div>

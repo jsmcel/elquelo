@@ -24,6 +24,26 @@ export async function POST(req: NextRequest) {
     // Calculate total amount
     const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
     
+    // Save order to database before creating checkout session
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: user.id,
+        product_type: productType,
+        items: items,
+        total_amount: totalAmount,
+        status: 'pending',
+        subscription_id: subscriptionId,
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (orderError) {
+      console.error('Error saving order:', orderError)
+      return NextResponse.json({ error: 'Failed to save order' }, { status: 500 })
+    }
+    
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -45,10 +65,10 @@ export async function POST(req: NextRequest) {
       customer_email: user.email,
       metadata: {
         user_id: user.id,
+        order_id: orderData.id,
         product_type: productType,
-        items: JSON.stringify(items),
+        items_count: items.length.toString(),
         subscription_id: subscriptionId,
-        initial_url: items[0]?.initial_url || 'https://elquelo.com/welcome',
       },
       shipping_address_collection: {
         allowed_countries: ['ES', 'FR', 'DE', 'IT', 'PT', 'NL', 'BE', 'AT', 'CH'],

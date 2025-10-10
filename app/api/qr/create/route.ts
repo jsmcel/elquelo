@@ -10,6 +10,9 @@ type MemberPayload = {
   title?: string
   destination_url?: string
   description?: string
+  email?: string
+  size?: string
+  is_novio_novia?: boolean
 }
 
 const supabase = createClient(
@@ -26,6 +29,7 @@ export async function POST(req: NextRequest) {
       description,
       members,
       group: groupName,
+      selectedPackages = [], // Paquetes seleccionados
     } = body
 
     const supabaseAuth = createRouteHandlerClient({ cookies })
@@ -135,6 +139,322 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      // Save participants to database if group exists
+      if (groupId && Array.isArray(members) && members.length > 0) {
+        const participantsData = members.map((member: MemberPayload) => ({
+          group_id: groupId,
+          name: member.name || '',
+          email: member.email || null,
+          size: member.size || 'M',
+          is_novio_novia: member.is_novio_novia || false,
+        }))
+
+        const { error: participantsError } = await supabase
+          .from('participants')
+          .insert(participantsData)
+
+        if (participantsError) {
+          console.error('Error creating participants:', participantsError)
+          // Don't fail the entire request, just log the error
+        }
+      }
+
+      // Create products for selected packages
+      console.log('🔍 Selected packages:', selectedPackages)
+      console.log('🔍 Data length:', data?.length)
+      console.log('🔍 Includes camisetas:', selectedPackages.includes('camisetas'))
+      
+      if (selectedPackages.includes('camisetas') && data && data.length > 0) {
+        console.log('✅ Creating camisetas for', data.length, 'participants')
+        
+        // Get real price from Printful API
+        let realPrice = 0 // Se carga de la API
+        try {
+          const priceResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/variants/price`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variantIds: [4013] })
+          })
+          
+          if (priceResponse.ok) {
+            const { prices } = await priceResponse.json()
+            if (prices[4013]) {
+              realPrice = prices[4013].finalPrice
+              console.log('✅ Real price for variant 4013:', realPrice)
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error fetching real price:', error)
+        }
+        
+        // Si no se pudo obtener el precio real, usar un precio por defecto
+        if (realPrice === 0) {
+          console.warn('⚠️ No se pudo obtener el precio real, usando precio por defecto')
+          realPrice = 15.00 // Precio por defecto temporal
+        }
+        
+        const productsData = data.map((qr: any) => ({
+          qr_id: qr.id,
+          user_id: user.id,
+          variant_id: 4013, // M White T-shirt por defecto
+          product_id: 71, // T-shirt product
+          size: 'M', // Default size, can be customized later
+          color: 'White',
+          color_code: '#FFFFFF',
+          quantity: 1,
+          price: realPrice, // Real price from API
+          created_at: new Date().toISOString(),
+        }))
+
+        console.log('📦 Creating design entries for:', productsData.length, 'products')
+        
+        // Create design entries in qr_designs table instead of qr_products
+        const designData = data.map((qr: any) => ({
+          qr_code: qr.code,
+          design_data: {
+            type: 'default',
+            text: qr.title || 'Mi QR',
+            color: '#000000',
+            font: 'Arial',
+            size: 24,
+            position: { x: 50, y: 50 },
+            variant_id: 4013,
+            product_id: 71,
+            products: [{
+              id: crypto.randomUUID(),
+              productId: 71,
+              templateId: 71,
+              variantId: 4013,
+              productName: 'Unisex Staple T-Shirt',
+              size: 'M',
+              color: 'White',
+              colorCode: '#FFFFFF',
+              designsByPlacement: {},
+              designMetadata: {},
+              variantMockups: {},
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }]
+          },
+          product_size: 'M',
+          product_color: 'White',
+          product_gender: 'unisex',
+          created_at: new Date().toISOString(),
+        }))
+
+        const { error: productsError } = await supabase
+          .from('qr_designs')
+          .insert(designData)
+
+        if (productsError) {
+          console.error('❌ Error creating products:', productsError)
+          console.error('Error creating products:', productsError)
+          // Don't fail the entire request, just log the error
+        } else {
+          console.log('✅ Successfully created', designData.length, 'design entries with camisetas')
+          
+          // Generate ONE generic mockup for all QRs using the first QR as template
+          let genericMockupUrls: any = {}
+          
+          try {
+            console.log('🎨 Generating generic mockup for all QRs...')
+            
+            // Generate a QR for the first QR to use as template
+            const { generateStandardQR } = await import('@/lib/qr-generator')
+            const templateQrUrl = `${process.env.QR_DOMAIN}/${data[0].code}`
+            const templateQrDataUrl = await generateStandardQR(templateQrUrl)
+            
+            // Convert to public URL for Printful
+            const base64Data = templateQrDataUrl.split(',')[1]
+            const qrBuffer = Buffer.from(base64Data, 'base64')
+            
+            // Upload template QR to Supabase Storage
+            const templateFileName = `template-qr.png`
+            const templateFilePath = `designs/${templateFileName}`
+            
+            const { data: templateUploadData, error: templateUploadError } = await supabase.storage
+              .from('designs')
+              .upload(templateFilePath, qrBuffer, {
+                contentType: 'image/png',
+                upsert: true,
+              })
+
+            if (templateUploadError) {
+              console.error(`❌ Error uploading template QR:`, templateUploadError)
+              throw new Error('Failed to upload template QR')
+            }
+
+            // Get public URL for template QR
+            const { data: templateUrlData } = supabase.storage
+              .from('designs')
+              .getPublicUrl(templateFilePath)
+            
+            const templateQrPublicUrl = templateUrlData.publicUrl
+            console.log(`✅ Template QR uploaded:`, templateQrPublicUrl)
+            
+            // Request mockup with real QR
+            const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productId: 71,
+                variantIds: [4013],
+                files: [{
+                  placement: 'front',
+                  imageUrl: templateQrPublicUrl,
+                  position: {
+                    top: 800,
+                    left: 800,
+                    width: 1800,
+                    height: 1800,
+                    areaWidth: 3600,
+                    areaHeight: 4800,
+                  }
+                }]
+              })
+            })
+
+            if (mockupResponse.ok) {
+              const mockupData = await mockupResponse.json()
+              const taskKey = mockupData.requestId
+              console.log(`✅ Generic mockup task created:`, taskKey)
+              
+              // Poll for mockup completion (max 10 attempts, 2 seconds each)
+              for (let attempt = 0; attempt < 10; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 2000))
+                
+                const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup?requestId=${taskKey}`)
+                if (!statusResponse.ok) continue
+                
+                const statusData = await statusResponse.json()
+                
+                if (statusData.status === 'completed' && statusData.normalizedMockups) {
+                  // Convert array format to object format expected by extractPrintfulSummary
+                  const normalizedArray = statusData.normalizedMockups
+                  genericMockupUrls = {}
+                  
+                  normalizedArray.forEach((mockup: any) => {
+                    const variantId = mockup.variantId
+                    const placement = mockup.placement
+                    const url = mockup.url
+                    
+                    if (!genericMockupUrls[variantId]) {
+                      genericMockupUrls[variantId] = {}
+                    }
+                    // Store as object with url property to match frontend expectations
+                    genericMockupUrls[variantId][placement] = { url: url }
+                  })
+                  
+                  console.log(`✅ Generic mockup completed:`, genericMockupUrls)
+                  break
+                }
+                
+                if (statusData.status === 'failed') {
+                  console.error(`❌ Generic mockup generation failed`)
+                  break
+                }
+              }
+            } else {
+              console.error(`❌ Failed to request generic mockup`)
+            }
+          } catch (error) {
+            console.error(`❌ Error generating generic mockup:`, error)
+          }
+          
+          // Now update all QRs with the same mockup and individual QR placements
+          for (const qr of data) {
+            try {
+              console.log(`🎨 Processing QR: ${qr.code}`)
+              
+              // Generate QR image for this specific QR (use qr_url to match dashboard)
+              const { generateStandardQR } = await import('@/lib/qr-generator')
+              const qrUrl = `${process.env.QR_DOMAIN}/${qr.code}`
+              const qrDataUrl = await generateStandardQR(qrUrl)
+              
+              // Convert data URL to Buffer
+              const base64Data = qrDataUrl.split(',')[1]
+              const qrBuffer = Buffer.from(base64Data, 'base64')
+              
+              // Upload QR to Supabase Storage
+              const fileName = `${qr.code}-front-qr.png`
+              const filePath = `designs/${fileName}`
+              
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('designs')
+                .upload(filePath, qrBuffer, {
+                  contentType: 'image/png',
+                  upsert: true,
+                })
+
+              if (uploadError) {
+                console.error(`❌ Error uploading QR for ${qr.code}:`, uploadError)
+                continue
+              }
+
+              // Get public URL
+              const { data: urlData } = supabase.storage
+                .from('designs')
+                .getPublicUrl(filePath)
+              
+              const qrPublicUrl = urlData.publicUrl
+              console.log(`✅ QR uploaded for ${qr.code}:`, qrPublicUrl)
+              
+              // Update design data with QR placement and shared mockup
+              console.log(`🔍 Generic mockup URLs for ${qr.code}:`, JSON.stringify(genericMockupUrls, null, 2))
+              const updatedDesignData = {
+                type: 'default',
+                text: qr.title || 'Mi QR',
+                color: '#000000',
+                font: 'Arial',
+                size: 24,
+                position: { x: 50, y: 50 },
+                variant_id: 4013,
+                product_id: 71,
+                products: [{
+                  id: crypto.randomUUID(),
+                  productId: 71,
+                  templateId: 71,
+                  variantId: 4013,
+                  productName: 'Unisex Staple T-Shirt',
+                  size: 'M',
+                  color: 'White',
+                  colorCode: '#FFFFFF',
+                  designsByPlacement: {
+                    front: qrPublicUrl
+                  },
+                  designMetadata: {
+                    front: { width: 1800, height: 1800 }
+                  },
+                  variantMockups: genericMockupUrls && Object.keys(genericMockupUrls).length > 0 
+                    ? genericMockupUrls 
+                    : {
+                        // Fallback: create a simple mockup structure if Printful fails
+                        4013: {
+                          front: qrPublicUrl // Use the QR as a simple mockup
+                        }
+                      },
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }]
+              }
+
+              const { error: updateError } = await supabase
+                .from('qr_designs')
+                .update({ design_data: updatedDesignData })
+                .eq('qr_code', qr.code)
+
+              if (updateError) {
+                console.error(`❌ Error updating design for ${qr.code}:`, updateError)
+              } else {
+                console.log(`✅ Design updated for ${qr.code}`)
+              }
+            } catch (error) {
+              console.error(`❌ Error processing QR ${qr.code}:`, error)
+            }
+          }
+        }
+      }
+
       const responsePayload = (data ?? []).map((qr) => ({
         ...qr,
         qr_url: `${process.env.QR_DOMAIN}/${qr.code}`,
@@ -143,6 +463,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, qrs: responsePayload })
     }
 
+    // Single QR creation
     const targetDestination =
       typeof destination_url === 'string' && destination_url.trim()
         ? destination_url.trim()

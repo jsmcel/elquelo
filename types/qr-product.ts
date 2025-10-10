@@ -24,6 +24,7 @@ export interface QRProduct {
   // Info adicional
   createdAt: string
   updatedAt: string
+  deletedAt?: string | null // Para soft delete
 }
 
 export interface QRDesignData {
@@ -48,6 +49,17 @@ export function migrateLegacyDesign(oldDesign: any): QRDesignData {
   // Si ya está en formato nuevo, retornar
   if (oldDesign?.version === '2.0' && Array.isArray(oldDesign?.products)) {
     return oldDesign as QRDesignData
+  }
+
+  // Si ya tiene un array de productos (formato del configurador), convertir a formato v2.0
+  if (Array.isArray(oldDesign?.products)) {
+    return {
+      version: '2.0',
+      products: oldDesign.products,
+      qrCode: oldDesign?.qrCode || '',
+      lastUpdated: new Date().toISOString(),
+      legacyDesign: oldDesign
+    }
   }
 
   // Convertir diseño antiguo (1 producto) al nuevo formato
