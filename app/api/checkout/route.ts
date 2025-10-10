@@ -41,16 +41,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to save order' }, { status: 500 })
     }
 
-    // Save order items separately
+    // Save order items separately (only using existing columns)
     const orderItems = items.map((item: any) => ({
       order_id: orderData.id,
-      product_name: item.name,
-      product_description: item.description,
-      variant_id: item.variant_id,
-      qr_code: item.qr_code,
+      product_id: item.product_id || null,
+      quantity: item.quantity || 1,
       price: item.price,
-      quantity: item.quantity,
-      product_id: item.product_id,
+      size: item.size || null,
+      color: item.color || null,
+      gender: item.gender || 'unisex',
     }))
 
     const { error: itemsError } = await supabase
