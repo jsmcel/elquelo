@@ -41,10 +41,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to save order' }, { status: 500 })
     }
 
-    // Save order items separately (only using existing columns)
+    // Save order items separately (only using existing columns without product FK)
     const orderItems = items.map((item: any) => ({
       order_id: orderData.id,
-      product_id: item.product_id || null,
       quantity: item.quantity || 1,
       price: item.price,
       size: item.size || null,
