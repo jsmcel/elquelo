@@ -20,6 +20,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { MultiProductDesignEditor } from './MultiProductDesignEditor'
+import { QRProductsList } from './QRProductsList'
 
 interface QRRow {
   id: string
