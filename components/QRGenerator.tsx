@@ -625,7 +625,7 @@ export function QRGenerator() {
         // Verificar que ambos conjuntos sean iguales
         const sameProducts = 
           sourceProductIds.size === targetProductIds.size &&
-          [...sourceProductIds].every(id => targetProductIds.has(id))
+          Array.from(sourceProductIds).every(id => targetProductIds.has(id))
         
         if (!sameProducts) {
           toast.error(`El QR ${targetCode} no tiene los mismos productos. Solo se pueden copiar diseños entre productos homogéneos.`)
@@ -1356,7 +1356,7 @@ export function QRGenerator() {
                           // Verificar que ambos conjuntos sean iguales
                           return (
                             sourceProductIds.size === targetProductIds.size &&
-                            [...sourceProductIds].every(id => targetProductIds.has(id))
+                            Array.from(sourceProductIds).every(id => targetProductIds.has(id))
                           )
                         })
                       
