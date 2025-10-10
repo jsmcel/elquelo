@@ -1,0 +1,63 @@
+name: Update Printful Catalog
+
+on:
+  schedule:
+    # Ejecutar todos los días a las 3:00 AM UTC (4:00 AM en España)
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub
+
+jobs:
+  scrape-catalog:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Printful scraper
+        env:
+          PRINTFUL_API_KEY: ${{ secrets.PRINTFUL_API_KEY }}
+          PRINTFUL_STORE_ID: ${{ secrets.PRINTFUL_STORE_ID }}
+          PRINTFUL_API_SCRAPE_BASE: 'https://api.printful.com/products'
+          PRINTFUL_SCRAPE_MAX_ID: '6000'
+          PRINTFUL_SCRAPE_DELAY_MS: '150'
+          PRINTFUL_SCRAPE_MAX_FAILURES: '150'
+          PRINTFUL_SCRAPE_SILENT: '1'
+        run: node scripts/scrape-printful-catalog.mjs --silent
+      
+      - name: Check if catalog changed
+        id: check_changes
+        run: |
+          if git diff --quiet mocks/printful-catalog-full.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit and push if changed
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add mocks/printful-catalog-full.json
+          git commit -m "chore: Update Printful catalog (automated daily update)"
+          git push
+      
+      - name: Summary
+        run: |
+          if [ "${{ steps.check_changes.outputs.changed }}" == "true" ]; then
+            echo "✅ Catálogo actualizado y pusheado"
+          else
+            echo "ℹ️ No hay cambios en el catálogo"
+          fi
+
