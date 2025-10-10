@@ -34,42 +34,29 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed':
         const session = event.data.object
         
-        // Crear orden en la base de datos
+        console.log('Processing checkout session completed:', session.id)
+        
+        // Actualizar orden existente (ya creada en checkout)
         const { data: order, error: orderError } = await supabase
           .from('orders')
-          .insert({
-            id: session.id,
-            user_id: session.metadata?.user_id,
+          .update({
             stripe_payment_intent_id: session.payment_intent,
             status: 'paid',
             total_amount: session.amount_total ? session.amount_total / 100 : 0,
             currency: session.currency,
             shipping_address: (session as any).shipping_details,
-            created_at: new Date().toISOString()
+            updated_at: new Date().toISOString()
           })
+          .eq('id', session.metadata?.order_id)
           .select()
           .single()
 
         if (orderError) {
-          console.error('Error creating order:', orderError)
+          console.error('Error updating order:', orderError)
           return NextResponse.json({ error: 'Database error' }, { status: 500 })
         }
 
-        // Procesar items del pedido
-        const items = JSON.parse(session.metadata?.items || '[]')
-        
-        for (const item of items) {
-          await supabase
-            .from('order_items')
-            .insert({
-              order_id: session.id,
-              product_id: null, // Por ahora null, se puede conectar con tabla de productos
-              quantity: item.quantity,
-              price: item.price,
-              qr_code: item.qr_code,
-              created_at: new Date().toISOString()
-            })
-        }
+        console.log('Order updated successfully:', order.id)
 
         // Enviar pedido a Printful automáticamente
         try {
@@ -79,7 +66,7 @@ export async function POST(req: NextRequest) {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              orderId: session.id
+              orderId: session.metadata?.order_id
             })
           })
 
