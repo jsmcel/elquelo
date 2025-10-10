@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
-export default function BienvenidaPage() {
+function BienvenidaContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const qrCode = searchParams.get('qr')
@@ -68,6 +68,18 @@ export default function BienvenidaPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function BienvenidaPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
+        <Loader2 className="h-12 w-12 animate-spin text-primary-600" />
+      </div>
+    }>
+      <BienvenidaContent />
+    </Suspense>
   )
 }
 
