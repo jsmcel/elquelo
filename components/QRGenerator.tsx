@@ -1240,7 +1240,7 @@ export function QRGenerator() {
         </div>
       )}
       
-      {/* Editor Printful */}
+      {/* Editor de Diseño */}
       {editorOpen && editingQR && (
         <PrintfulDesignEditor
           // Use short code for filenames/metadatos
@@ -1288,7 +1288,7 @@ export function QRGenerator() {
                   <div className="rounded-lg bg-gray-50 p-4">
                     <h4 className="text-sm font-semibold text-gray-900">Detalles del guardado</h4>
                     <div className="mt-2 space-y-1 text-sm text-gray-600">
-                      <p>Producto: {viewingDesign.designData?.printfulProduct?.name || 'Producto'}</p>
+                      <p>Producto: {viewingDesign.designData?.printfulProduct?.name || 'Producto personalizado'}</p>
                       <p>Guardado: {new Date(viewingDesign.designData?.savedAt || viewingDesign.designData?.createdAt || Date.now()).toLocaleString()}</p>
                       <p>QR destino: {viewingDesign.code}</p>
                     </div>

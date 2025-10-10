@@ -1164,7 +1164,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
         toast(data.message)
       }
     } catch (error) {
-      console.error('Error fetching Printful product', error)
+      console.error('Error fetching product', error)
       const message = error instanceof Error ? error.message : 'No pudimos cargar los datos del producto. Intenta de nuevo.'
       setLastError(message)
       setProductData(null)
