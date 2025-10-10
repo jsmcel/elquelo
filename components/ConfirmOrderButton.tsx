@@ -201,7 +201,6 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
                 €{totalPrice.toFixed(2)}
               </div>
               <div className="text-sm text-primary-500 font-medium">Total</div>
-              <div className="text-xs text-primary-400">Incluye markup 40%</div>
             </>
           )}
         </div>
@@ -227,11 +226,6 @@ export function ConfirmOrderButton({ qrCodes, className = '' }: ConfirmOrderButt
               <Check className="h-4 w-4 text-green-600 mr-3 flex-shrink-0" />
               Entrega en 5-7 días laborables
             </li>
-            {!loadingPrices && qrDesigns.length > 0 && (
-              <li className="text-xs text-primary-600 mt-2 pt-2 border-t border-primary-200">
-                Precio base Printful + 40% markup
-              </li>
-            )}
           </ul>
         </div>
 
