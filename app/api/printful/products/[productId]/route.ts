@@ -4,6 +4,7 @@ import { PrintfulClient } from '@/lib/printful-v2'
 interface PlacementEntry {
   placement: string
   label: string
+  description?: string
   printfileId: number | null
   width: number
   height: number
@@ -15,6 +16,8 @@ interface PlacementEntry {
     width: number
     height: number
   }
+  isConflicting?: boolean
+  conflictMessage?: string
 }
 
 const FALLBACK_PLACEMENTS: PlacementEntry[] = [
