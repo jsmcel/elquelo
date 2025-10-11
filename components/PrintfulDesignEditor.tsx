@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { Modal, ModalFooter } from './ui/Modal'
 
 interface PrintfulDesignEditorProps {
   // Short QR code identifier (e.g., ABC123) used for filenames/DB
@@ -1807,22 +1808,21 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8">
-      <div className="relative w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
-        <button
-          onClick={() => {
-            if (generatingMockup) {
-              toast.error('Espera a que termine la generacieeen del mockup')
-              return
-            }
-            onClose()
-          }}
-          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:border-gray-300 hover:text-gray-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
-        <div className="grid gap-6 p-6 md:grid-cols-[1.2fr_1fr]">
+    <Modal
+      isOpen={true}
+      onClose={() => {
+        if (generatingMockup) {
+          toast.error('Espera a que termine la generacieeen del mockup')
+          return
+        }
+        onClose()
+      }}
+      title={productData?.name || 'Diseñador de Producto'}
+      description={`QR: ${qrCode}`}
+      size="6xl"
+      fullHeight={true}
+    >
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
           <div className="space-y-4">
             <CatalogSelector 
               selectedId={selectedProductId} 
@@ -1879,7 +1879,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                   <button
                     key={placement.placement}
                     onClick={() => setActivePlacement(placement.placement)}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    className={`min-h-[44px] rounded-full border px-4 py-2 text-xs font-semibold transition touch-manipulation ${
                       isActive ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-200 text-gray-700'
                     }`}
                   >
@@ -2072,26 +2072,28 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-sm">
-              <button
-                onClick={handleSave}
-                disabled={!hasAnyDesign || generatingMockup || uploading}
-                className="rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Guardar diseeeeo
-              </button>
-              <button
-                onClick={onClose}
-                className="rounded-full border border-gray-200 px-4 py-2 font-semibold text-gray-700 transition hover:border-gray-300"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-          )}
         </div>
       </div>
-    </div>
+
+      {/* Footer con botones sticky */}
+      <ModalFooter className="sticky bottom-0 bg-white border-t border-gray-200">
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto min-h-[44px] rounded-full border border-gray-200 px-4 py-2 font-semibold text-gray-700 transition hover:border-gray-300 touch-manipulation"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!hasAnyDesign || generatingMockup || uploading}
+            className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+          >
+            Guardar diseño
+          </button>
+        </div>
+      </ModalFooter>
+    </Modal>
   )
 }
 
