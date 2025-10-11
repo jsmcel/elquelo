@@ -7,7 +7,7 @@ import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide
 import { toast } from 'react-hot-toast'
 import { Modal, ModalFooter } from './ui/Modal'
 import { calculateOptimalDimensions, ensureSquareQR, validatePosition } from '@/lib/printful-dimensions'
-import { getProductName } from '@/lib/product-names'
+import { getProductName, getProductInfo, getProductCategory, CATEGORY_INFO } from '@/lib/product-names'
 
 // ========================================
 // MOCKUP CACHE UTILITIES
@@ -706,8 +706,6 @@ interface CatalogSelectorProps {
 
 function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className, autoCollapseOnSelect = true, confirmedProductId, onConfirmProduct }: CatalogSelectorProps) {
   const [items, setItems] = useState<CatalogItem[]>(() => (fallbackItem ? [fallbackItem] : []))
-  const [typeOptions, setTypeOptions] = useState<CatalogTypeOption[]>([])
-  const [selectedType, setSelectedType] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -734,15 +732,6 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
       }
       return [fallbackItem, ...prev]
     })
-    if (fallbackItem.type) {
-      setTypeOptions((prev) => {
-        const normalizedValue = fallbackItem.type!.toLowerCase()
-        if (prev.some((option) => option.value === normalizedValue)) {
-          return prev
-        }
-        return [...prev, { value: normalizedValue, count: 1 }].sort((a, b) => a.value.localeCompare(b.value))
-      })
-    }
   }, [fallbackItem])
 
   useEffect(() => {
@@ -780,13 +769,6 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
 
       const normalizedItems = normalizeCatalogItems(Array.isArray(data?.items) ? data.items : data?.products)
       const fallbackValue = fallbackRef.current
-      const normalizedTypes = normalizeCatalogTypeOptions(data?.typeOptions)
-
-      const fallbackType = fallbackValue?.type ? fallbackValue.type.toLowerCase() : null
-      const mergedTypeOptions =
-        fallbackType && !normalizedTypes.some((option) => option.value === fallbackType)
-          ? [...normalizedTypes, { value: fallbackType, count: 1 }].sort((a, b) => a.value.localeCompare(b.value))
-          : normalizedTypes
 
       setItems(() => {
         const nextItems = normalizedItems.slice()
@@ -800,8 +782,6 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
         }
         return nextItems
       })
-
-      setTypeOptions(mergedTypeOptions)
 
       const countryValue = normalizeOptionalString(data?.country)
       setCountry(countryValue ? countryValue.toUpperCase() : null)
@@ -832,26 +812,49 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
     }
   }, [fetchCatalog])
 
-  const normalizedType = selectedType.trim().toLowerCase()
-  
-  // Lista de productos filtrados para el dropdown
+  // Lista de productos filtrados para el dropdown (solo por búsqueda)
   const filteredItems = useMemo(() => {
     let list = items
-    if (normalizedType) {
-      list = list.filter((item) => (item.type || '').toLowerCase().includes(normalizedType))
-    }
     const trimmedSearch = searchTerm.trim().toLowerCase()
+    
     if (trimmedSearch) {
-      list = list.filter((item) => {
-      const haystack = [String(item.id), item.name, item.brand, item.type]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(trimmedSearch)
-    })
+      list = list.filter(item => {
+        const translatedName = getProductName(item.id).toLowerCase()
+        const category = CATEGORY_INFO[getProductCategory(item.id)].name.toLowerCase()
+        const haystack = [
+          String(item.id),
+          item.name,
+          translatedName,
+          category,
+          item.brand,
+          item.type
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(trimmedSearch)
+      })
     }
+    
     return list
-  }, [items, normalizedType, searchTerm])
+  }, [items, searchTerm])
+
+  // Agrupar productos filtrados por categoría
+  const productsByCategory = useMemo(() => {
+    const grouped = {
+      ropa: [] as typeof items,
+      hogar: [] as typeof items,
+      accesorios: [] as typeof items,
+      otros: [] as typeof items
+    }
+    
+    filteredItems.forEach(item => {
+      const category = getProductCategory(item.id)
+      grouped[category].push(item)
+    })
+    
+    return grouped
+  }, [filteredItems])
 
   const confirmedItem = useMemo(() => {
     // Para opciones de personalización, solo usar confirmedSelection
@@ -886,13 +889,6 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
     }
   }, [fetchedAt])
 
-  const formatTypeLabel = useCallback((value: string) => {
-    return value
-      .split(/[_\s]+/)
-      .filter(Boolean)
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join(' ')
-  }, [])
 
   const handleDropdownSelect = useCallback(
     (productId: string) => {
@@ -938,9 +934,6 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
     setSearchTerm(event.target.value)
   }, [])
 
-  const handleTypeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedType(event.target.value)
-  }, [])
 
   const containerClassName = ['rounded-2xl border border-gray-200 bg-white p-4', className].filter(Boolean).join(' ')
   const totalItems = items.length
@@ -983,29 +976,17 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
 
       {!collapsed && (
         <div className="mt-3 space-y-3">
-          {/* Filtros */}
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
+          {/* Filtro de búsqueda */}
+          <div>
             <input
               value={searchTerm}
               onChange={handleSearchChange}
-              placeholder="Buscar por nombre, marca o ID"
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Buscar por nombre, marca, categoría o ID"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
-            <select
-              value={selectedType}
-              onChange={handleTypeChange}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Todos los tipos</option>
-              {typeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {formatTypeLabel(option.value)} ({option.count})
-                </option>
-              ))}
-            </select>
           </div>
 
-          {/* Dropdown de productos */}
+          {/* Dropdown de productos organizado por categorías */}
           <div>
             <select
               value={tentativeSelection ? String(tentativeSelection) : ''}
@@ -1018,14 +999,27 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
                   : 'No hay productos disponibles'
                 }
               </option>
-              {filteredItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  #{item.id} - {item.name} {item.brand ? `(${item.brand})` : ''}
-                </option>
-              ))}
+              
+              {Object.entries(productsByCategory).map(([category, categoryItems]) => {
+                if (categoryItems.length === 0) return null
+                const categoryInfo = CATEGORY_INFO[category as keyof typeof CATEGORY_INFO]
+                
+                return (
+                  <optgroup key={category} label={`${categoryInfo.icon} ${categoryInfo.name} (${categoryItems.length})`}>
+                    {categoryItems.map(item => {
+                      const info = getProductInfo(item.id)
+                      return (
+                        <option key={item.id} value={item.id}>
+                          {info?.emoji || ''} {getProductName(item.id)} · {item.brand || ''}
+                        </option>
+                      )
+                    })}
+                  </optgroup>
+                )
+              })}
             </select>
             <p className="mt-1 text-[11px] text-gray-500">
-              Selecciona un producto de la lista filtrada para continuar.
+              Selecciona un producto de la lista organizada por categorías para continuar.
             </p>
           </div>
 
@@ -1066,15 +1060,32 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
       {error && <p className="mt-2 text-xs text-orange-600">{error}</p>}
 
       {confirmedItem && (
-        <div className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
-          <p className="font-semibold text-gray-900">#{confirmedItem.id} - {confirmedItem.name}</p>
-          <p>
-            {confirmedItem.brand ? `${confirmedItem.brand} - ` : ''}
-            {confirmedItem.type ? formatTypeLabel(confirmedItem.type) : 'Sin tipo'}
-          </p>
-          {collapsed && (
-            <p className="mt-2 text-[11px] text-gray-500">Catalogo oculto. Pulsa el boton Cambiar producto para volver a ver el catalogo.</p>
-          )}
+        <div className="mt-3 rounded-lg border-2 border-primary-200 bg-white p-4">
+          <div className="flex gap-4 items-start">
+            {confirmedItem.image && (
+              <img 
+                src={confirmedItem.image} 
+                alt={getProductName(confirmedItem.id)}
+                className="w-20 h-20 rounded-lg object-cover border border-gray-200"
+              />
+            )}
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{getProductInfo(confirmedItem.id)?.emoji}</span>
+                <p className="font-bold text-gray-900 text-base">
+                  {getProductName(confirmedItem.id)}
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                {CATEGORY_INFO[getProductCategory(confirmedItem.id)].name}
+                {confirmedItem.brand && ` · ${confirmedItem.brand}`}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">ID: #{confirmedItem.id}</p>
+              {collapsed && (
+                <p className="mt-2 text-[11px] text-gray-500">Catálogo oculto. Pulsa el botón Cambiar producto para volver a ver el catálogo.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
