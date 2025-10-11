@@ -1106,10 +1106,22 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
   })
   const [confirmedProductId, setConfirmedProductId] = useState<number | null>(() => {
     const candidate = Number(savedDesignData?.printfulProduct?.productId || savedDesignData?.productId)
-    if (Number.isFinite(candidate) && candidate > 0) {
+    const productName = savedDesignData?.printfulProduct?.name || savedDesignData?.productName
+    const variantId = savedDesignData?.printfulProduct?.variantId || savedDesignData?.printful?.variantId
+    
+    // Es un producto nuevo si:
+    // - No hay variantId o es 0
+    // - El nombre es genérico ('Producto')
+    // - O no hay designsByPlacement (producto sin diseño)
+    const isNewProduct = !variantId || variantId === 0 || 
+                        productName === 'Producto' || 
+                        !savedDesignData?.designsByPlacement ||
+                        Object.keys(savedDesignData?.designsByPlacement || {}).length === 0
+    
+    if (Number.isFinite(candidate) && candidate > 0 && !isNewProduct) {
       return candidate
     }
-    return null // Si no hay producto válido, mostrar catálogo
+    return null // Producto nuevo o inválido, mostrar catálogo
   })
   const [loadingProduct, setLoadingProduct] = useState(true)
   const [productData, setProductData] = useState<ProductData | null>(null)
@@ -1840,8 +1852,50 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
         })
         setGeneratingMockup(false)
         activeTaskRef.current = null
-        setStatusMessage(data.message || 'Mockup generado con eeexito')
-        toast.success('Mockup generado con eeexito')
+        setStatusMessage(data.message || 'Mockup generado con éxito')
+        toast.success('Mockup generado con éxito')
+        
+        // RE-GUARDAR el diseño con los mockups actualizados
+        console.log('🔄 Re-guardando diseño con mockups actualizados...')
+        const updatedPayload = {
+          editorType: 'printful',
+          qrCode,
+          savedAt: new Date().toISOString(),
+          designsByPlacement,
+          designMetadata,
+          variantMockups: { ...variantMockups, [variantId]: placementsForVariant },
+          selectedVariantId,
+          productId: productData.productId,
+          slug: String(selectedProductId),
+          productName: productData.name,
+          printfulProduct: {
+            productId: productData.productId,
+            templateId: productData.templateId,
+            name: productData.name,
+            variantId: selectedVariantId,
+          },
+          printful: {
+            productId: productData.productId,
+            templateId: productData.templateId,
+            productName: productData.name,
+            source: productData.source,
+            variantId: selectedVariantId,
+            size: selectedVariant?.size || selectedSize || null,
+            color: selectedVariant?.colorName || null,
+            colorCode: selectedVariant?.colorCode || selectedColorCode || null,
+            placements: Object.fromEntries(
+              Object.entries(designsByPlacement).map(([placement, url]) => [placement, { imageUrl: url || null }])
+            ),
+            designMetadata,
+            variantMockups: { ...variantMockups, [variantId]: placementsForVariant },
+            activePlacement,
+            lastMessage: statusMessage,
+          },
+        }
+        
+        // Llamar a onSave con los mockups actualizados
+        onSave(updatedPayload)
+        console.log('✅ Diseño re-guardado con mockups')
         return
       }
 
