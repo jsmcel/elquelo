@@ -20,10 +20,11 @@ import {
   Eye,
 } from 'lucide-react'
 import { MultiProductDesignEditor } from './MultiProductDesignEditor'
+import { SingleProductEditor } from './SingleProductEditor'
 import { QRProductsList } from './QRProductsList'
 import { ViewMultiProductDesignModal } from './ViewMultiProductDesignModal'
 import { Modal, ModalFooter } from './ui/Modal'
-import { migrateLegacyDesign } from '@/types/qr-product'
+import { migrateLegacyDesign, QRProduct } from '@/types/qr-product'
 
 interface QRRow {
   id: string
@@ -281,6 +282,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const [qrImages, setQrImages] = useState<Record<string, string>>({})
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingQR, setEditingQR] = useState<QRRow | null>(null)
+  const [editingProductId, setEditingProductId] = useState<string | null>(null) // Nuevo: ID del producto siendo editado
   const [viewDesignOpen, setViewDesignOpen] = useState(false)
   const [viewingDesign, setViewingDesign] = useState<{ code: string; designData: any } | null>(null)
   const [copyDesignOpen, setCopyDesignOpen] = useState(false)
@@ -656,6 +658,91 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     }
     setEditorOpen(false)
     setEditingQR(null)
+  }
+
+  // Nuevo: Abrir editor individual para un producto específico
+  const handleOpenSingleProductEditor = (productId: string) => {
+    setEditingProductId(productId)
+    // El dashboard se cierra automáticamente (editorOpen sigue true)
+  }
+
+  // Nuevo: Volver del editor individual al dashboard
+  const handleBackToDashboard = () => {
+    setEditingProductId(null)
+    // El dashboard se muestra automáticamente
+  }
+
+  // Nuevo: Guardar producto individual y actualizar el diseño
+  const handleSaveProductDesign = async (designData: any) => {
+    if (!editingQR || !editingProductId) return
+
+    const currentDesignData = designs[editingQR.code]?.designData
+    const migratedDesign = currentDesignData ? migrateLegacyDesign(currentDesignData) : {
+      version: '2.0' as const,
+      products: [],
+      qrCode: editingQR.code,
+      lastUpdated: new Date().toISOString()
+    }
+
+    // Convertir el designData del editor al formato QRProduct
+    const updatedProduct: QRProduct = {
+      id: editingProductId,
+      productId: designData?.productId || designData?.printfulProduct?.productId || 71,
+      templateId: designData?.templateId || designData?.printfulProduct?.templateId || 71,
+      variantId: designData?.printfulProduct?.variantId || designData?.printful?.variantId || 0,
+      productName: designData?.productName || designData?.printfulProduct?.name || 'Producto',
+      size: designData?.printful?.size || designData?.printfulProduct?.size || null,
+      color: designData?.printful?.color || designData?.printfulProduct?.color || null,
+      colorCode: designData?.printful?.colorCode || designData?.printfulProduct?.colorCode || null,
+      designsByPlacement: (() => {
+        const merged = {
+          ...(designData?.designsByPlacement || {}),
+          ...(designData?.printful?.placements ? 
+            Object.fromEntries(
+              Object.entries(designData.printful.placements).map(([k, v]: [string, any]) => [k, v?.imageUrl || v])
+            ) : {}
+          ),
+        }
+        
+        return Object.fromEntries(
+          Object.entries(merged).map(([key, value]: [string, any]) => {
+            if (typeof value === 'string') return [key, value]
+            if (value && typeof value === 'object' && 'imageUrl' in value) return [key, value.imageUrl || null]
+            return [key, value || null]
+          })
+        )
+      })(),
+      designMetadata: {
+        ...(designData?.designMetadata || {}),
+        ...(designData?.printful?.designMetadata || {}),
+      },
+      variantMockups: designData?.variantMockups || designData?.printful?.variantMockups || {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+
+    // Actualizar la lista de productos
+    const updatedProducts = [...migratedDesign.products]
+    const existingIndex = updatedProducts.findIndex(p => p.id === editingProductId)
+    
+    if (existingIndex >= 0) {
+      updatedProducts[existingIndex] = updatedProduct
+    } else {
+      updatedProducts.push(updatedProduct)
+    }
+
+    // Guardar el diseño completo
+    const finalDesignData = {
+      ...migratedDesign,
+      products: updatedProducts,
+      lastUpdated: new Date().toISOString()
+    }
+
+    await uploadDesignToServer(editingQR.code, finalDesignData)
+    
+    // Volver al dashboard
+    setEditingProductId(null)
+    toast.success('Producto guardado correctamente')
   }
 
   const handleViewDesign = (code: string) => {
@@ -1400,21 +1487,51 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         </div>
       )}
       
-      {/* Editor de Diseño Multi-Producto */}
-      {editorOpen && editingQR && (
+      {/* Editor de Diseño Multi-Producto - Dashboard de Productos */}
+      {editorOpen && editingQR && !editingProductId && (
         <MultiProductDesignEditor
-          // Use short code for filenames/metadatos
           qrCode={editingQR.code}
-          // Use canonical content (same as dashboard) for QR encoding
           qrContent={editingQR.qr_url}
           onClose={() => {
             setEditorOpen(false)
             setEditingQR(null)
           }}
           onSave={handleEditorSave}
+          onEditProduct={handleOpenSingleProductEditor}
           savedDesignData={designs[editingQR.code]?.designData}
         />
       )}
+
+      {/* Editor Individual de Producto */}
+      {editorOpen && editingQR && editingProductId && (() => {
+        const currentDesignData = designs[editingQR.code]?.designData
+        const migratedDesign = currentDesignData ? migrateLegacyDesign(currentDesignData) : {
+          version: '2.0' as const,
+          products: [],
+          qrCode: editingQR.code,
+          lastUpdated: new Date().toISOString()
+        }
+        const product = migratedDesign.products.find((p: QRProduct) => p.id === editingProductId)
+        
+        if (!product) {
+          return null
+        }
+
+        return (
+          <SingleProductEditor
+            qrCode={editingQR.code}
+            qrContent={editingQR.qr_url}
+            product={product}
+            onSave={handleSaveProductDesign}
+            onBack={handleBackToDashboard}
+            onCancel={() => {
+              setEditorOpen(false)
+              setEditingQR(null)
+              setEditingProductId(null)
+            }}
+          />
+        )
+      })()}
 
       {/* Modal para ver diseño multi-producto */}
       {viewDesignOpen && viewingDesign && (
