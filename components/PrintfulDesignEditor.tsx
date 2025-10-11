@@ -1975,7 +1975,9 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     console.log('?? [PrintfulDesignEditor] Llamando onSave con payload')
     onSave(payload)
     console.log('💾 [PrintfulDesignEditor] onSave llamado exitosamente')
-    toast.success('Diseño guardado')
+    
+    // Mostrar mensaje de que se está generando el mockup
+    toast.success('Diseño guardado. Generando mockup oficial...')
     
     // GENERAR MOCKUP AUTOMÁTICAMENTE
     handleGenerateMockup()
@@ -2298,7 +2300,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           <button
             onClick={handleSave}
             disabled={!qrPlaced || generatingMockup || uploading}
-            className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
+            className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation flex items-center justify-center gap-2"
           >
             {!qrPlaced ? '?? Coloca el QR primero' : 'Guardar dise�o y generar mockup'}
           </button>
