@@ -22,6 +22,7 @@ import {
 import { MultiProductDesignEditor } from './MultiProductDesignEditor'
 import { QRProductsList } from './QRProductsList'
 import { ViewMultiProductDesignModal } from './ViewMultiProductDesignModal'
+import { Modal, ModalFooter } from './ui/Modal'
 import { migrateLegacyDesign } from '@/types/qr-product'
 
 interface QRRow {
@@ -1370,24 +1371,16 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       )}
       {/* Modal para copiar diseno */}
       {copyDesignOpen && sourceDesign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Copiar diseno - {sourceDesign.code}
-              </h3>
-              <button
-                onClick={() => {
-                  setCopyDesignOpen(false)
-                  setSourceDesign(null)
-                  setSelectedTargetQRs([])
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setCopyDesignOpen(false)
+            setSourceDesign(null)
+            setSelectedTargetQRs([])
+          }}
+          title={`Copiar diseño - ${sourceDesign.code}`}
+          size="2xl"
+        >
               <div className="space-y-4">
                 {/* Informacion del diseno origen */}
                 <div className="bg-blue-50 p-4 rounded-lg">
@@ -1434,7 +1427,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                       }
                       
                       return compatibleQRs.map((qr) => (
-                        <label key={qr.code} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <label key={qr.code} className="flex items-start p-3 border rounded-lg hover:bg-gray-50 cursor-pointer min-h-[44px] touch-manipulation">
                           <input
                             type="checkbox"
                             checked={selectedTargetQRs.includes(qr.code)}
@@ -1445,9 +1438,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                                 setSelectedTargetQRs(selectedTargetQRs.filter(code => code !== qr.code))
                               }
                             }}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-5 w-5 mt-0.5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
                           />
-                          <div className="ml-3 flex-1">
+                          <div className="ml-3 flex-1 min-w-0">
                             <div className="text-sm font-medium text-gray-900">
                               {qr.title || 'Sin titulo'} ({qr.code})
                             </div>
@@ -1477,40 +1470,36 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                   </div>
                 </div>
 
-                {/* Botones de accion */}
-                <div className="flex justify-end space-x-3 pt-4 border-t">
-                  <button
-                    onClick={() => {
-                      setCopyDesignOpen(false)
-                      setSourceDesign(null)
-                      setSelectedTargetQRs([])
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleCopyDesignToQRs}
-                    disabled={selectedTargetQRs.length === 0 || copyingDesign}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {copyingDesign ? (
-                      <>
-                        <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
-                        Copiando...
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4 inline mr-2" />
-                        Copiar a {selectedTargetQRs.length} QR(s)
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <ModalFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+            <button
+              onClick={() => {
+                setCopyDesignOpen(false)
+                setSourceDesign(null)
+                setSelectedTargetQRs([])
+              }}
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCopyDesignToQRs}
+              disabled={selectedTargetQRs.length === 0 || copyingDesign}
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation flex items-center justify-center gap-2"
+            >
+              {copyingDesign ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Copiando...
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  Copiar a {selectedTargetQRs.length} QR(s)
+                </>
+              )}
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
 
       {/* Modal de Papelera de Productos */}
