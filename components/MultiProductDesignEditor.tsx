@@ -88,7 +88,8 @@ export function MultiProductDesignEditor({
   }
 
   const handleSaveProductDesign = (designData: any) => {
-    console.log('Guardando diseño de producto:', designData)
+    console.log('🔄 Recibido designData:', designData?.designsByPlacement)
+    console.log('🔄 EditingProduct:', editingProduct?.designsByPlacement)
 
     // Convertir el diseño al formato QRProduct
     const updatedProduct: QRProduct = {
@@ -100,12 +101,27 @@ export function MultiProductDesignEditor({
       size: designData?.printful?.size || designData?.printfulProduct?.size || editingProduct?.size || null,
       color: designData?.printful?.color || designData?.printfulProduct?.color || editingProduct?.color || null,
       colorCode: designData?.printful?.colorCode || designData?.printfulProduct?.colorCode || editingProduct?.colorCode || null,
-      designsByPlacement: editingProduct?.designsByPlacement || designData?.designsByPlacement || designData?.printful?.placements || {},
-      designMetadata: editingProduct?.designMetadata || designData?.designMetadata || designData?.printful?.designMetadata || {},
-      variantMockups: editingProduct?.variantMockups || designData?.variantMockups || designData?.printful?.variantMockups || {},
+      // CRÍTICO: Priorizar designData sobre editingProduct para preservar imágenes nuevas
+      designsByPlacement: {
+        ...(editingProduct?.designsByPlacement || {}),
+        ...(designData?.designsByPlacement || {}),
+        ...(designData?.printful?.placements ? 
+          Object.fromEntries(
+            Object.entries(designData.printful.placements).map(([k, v]: [string, any]) => [k, v?.imageUrl || v])
+          ) : {}
+        ),
+      },
+      designMetadata: {
+        ...(editingProduct?.designMetadata || {}),
+        ...(designData?.designMetadata || {}),
+        ...(designData?.printful?.designMetadata || {}),
+      },
+      variantMockups: designData?.variantMockups || designData?.printful?.variantMockups || editingProduct?.variantMockups || {},
       createdAt: editingProduct?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
+    
+    console.log('✅ Resultado final designsByPlacement:', updatedProduct.designsByPlacement)
 
     // Validar que tiene variantId
     if (!updatedProduct.variantId || updatedProduct.variantId === 0) {
@@ -212,13 +228,18 @@ export function MultiProductDesignEditor({
                             size: editingProduct.size,
                             color: editingProduct.color,
                             colorCode: editingProduct.colorCode,
-                            placements: editingProduct.designsByPlacement,
+                            // CRÍTICO: Convertir designsByPlacement al formato correcto
+                            placements: Object.fromEntries(
+                              Object.entries(editingProduct.designsByPlacement || {}).map(([placement, url]) => 
+                                [placement, { imageUrl: url || null }]
+                              )
+                            ),
                             designMetadata: editingProduct.designMetadata,
                             variantMockups: editingProduct.variantMockups
                           },
-                          designsByPlacement: editingProduct.designsByPlacement,
-                          designMetadata: editingProduct.designMetadata,
-                          variantMockups: editingProduct.variantMockups
+                          designsByPlacement: editingProduct.designsByPlacement || {},
+                          designMetadata: editingProduct.designMetadata || {},
+                          variantMockups: editingProduct.variantMockups || {}
                   }}
                 />
               </div>

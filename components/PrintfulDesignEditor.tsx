@@ -1672,7 +1672,12 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
         ensureDesignMetadata(activePlacement, data.url)
       }
 
-      setDesignsByPlacement((prev) => ({ ...prev, [activePlacement]: data.url }))
+      setDesignsByPlacement((prev) => {
+        const updated = { ...prev, [activePlacement]: data.url }
+        console.log('📤 Imagen subida:', activePlacement, data.url)
+        console.log('📤 designsByPlacement actualizado:', updated)
+        return updated
+      })
       if (!dimensions) {
         ensureDesignMetadata(activePlacement, data.url)
       }
@@ -1947,8 +1952,10 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       },
     }
 
+    console.log('💾 Guardando designsByPlacement:', designsByPlacement)
+    console.log('💾 Payload completo:', payload)
     onSave(payload)
-    toast.success('Diseeeeo guardado')
+    toast.success('Diseño guardado')
   }
 
   return (
