@@ -2205,20 +2205,9 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       <div className="space-y-6">
         {/* Header compacto - menos prominente */}
         <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-          <div className="flex items-center gap-3">
-            {selectedItem?.image && (
-              <div className="h-10 w-10 overflow-hidden rounded bg-gray-100">
-                <img
-                  src={selectedItem.image}
-                  alt={selectedItem.name}
-                  className="h-full w-full object-contain"
-                />
-              </div>
-            )}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">{productData?.name || 'Producto'}</h3>
-              <p className="text-xs text-gray-500">QR: {qrCode}</p>
-            </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">{productData?.name || 'Producto'}</h3>
+            <p className="text-xs text-gray-500">QR: {qrCode}</p>
           </div>
           <div className="text-right">
             {statusMessage && <p className="text-xs text-blue-600">{statusMessage}</p>}
