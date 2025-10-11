@@ -6,6 +6,7 @@ import { ProductListManager } from './ProductListManager'
 import { QRProduct, QRDesignData, migrateLegacyDesign } from '@/types/qr-product'
 import { toast } from 'react-hot-toast'
 import { X, Edit2, Image as ImageIcon } from 'lucide-react'
+import { Modal, ModalFooter } from './ui/Modal'
 
 interface MultiProductDesignEditorProps {
   qrCode: string
@@ -165,42 +166,30 @@ export function MultiProductDesignEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative w-full max-w-7xl h-[90vh] rounded-3xl bg-white shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Diseñador Multi-Producto
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              QR: <span className="font-mono font-semibold">{qrCode}</span>
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Diseñador Multi-Producto"
+      description={`QR: ${qrCode}`}
+      size="7xl"
+      fullHeight={true}
+    >
+      {/* Content */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden">
+        {/* Sidebar - Lista de productos */}
+        <div className="w-full lg:w-80 flex-shrink-0 overflow-y-auto">
+          <ProductListManager
+            products={products}
+            selectedProductId={selectedProductId}
+            onSelectProduct={handleSelectProduct}
+            onAddProduct={handleAddProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onEditProduct={handleEditProduct}
+          />
         </div>
 
-        {/* Content */}
-        <div className="flex-1 flex gap-4 p-6 overflow-hidden">
-          {/* Sidebar - Lista de productos */}
-          <div className="w-80 flex-shrink-0 overflow-y-auto">
-            <ProductListManager
-              products={products}
-              selectedProductId={selectedProductId}
-              onSelectProduct={handleSelectProduct}
-              onAddProduct={handleAddProduct}
-              onDeleteProduct={handleDeleteProduct}
-              onEditProduct={handleEditProduct}
-            />
-          </div>
-
-          {/* Editor Area */}
-          <div className="flex-1 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center">
+        {/* Editor Area */}
+        <div className="flex-1 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center min-h-[400px] lg:min-h-0">
             {showEditor && editingProduct ? (
               <div className="w-full h-full relative">
                 <PrintfulDesignEditor
@@ -262,7 +251,7 @@ export function MultiProductDesignEditor({
                   {selectedProduct.variantMockups && Object.keys(selectedProduct.variantMockups).length > 0 ? (
                     <div className="space-y-6">
                       <h4 className="text-lg font-semibold text-gray-900">Mockups</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {Object.entries(selectedProduct.variantMockups).map(([variantId, mockupsByPlacement]: [string, any]) => (
                           Object.entries(mockupsByPlacement).map(([placement, mockup]: [string, any]) => (
                             <div key={`${variantId}-${placement}`} className="space-y-2">
@@ -282,7 +271,7 @@ export function MultiProductDesignEditor({
                   ) : selectedProduct.designsByPlacement && Object.keys(selectedProduct.designsByPlacement).length > 0 ? (
                     <div className="space-y-6">
                       <h4 className="text-lg font-semibold text-gray-900">Diseños</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {Object.entries(selectedProduct.designsByPlacement).map(([placement, imageUrl]: [string, any]) => (
                           <div key={placement} className="space-y-2">
                             <p className="text-sm font-medium text-gray-700 capitalize">{placement}</p>
@@ -331,31 +320,27 @@ export function MultiProductDesignEditor({
           <div className="text-sm text-gray-600">
             {products.length} producto{products.length !== 1 ? 's' : ''} configurado{products.length !== 1 ? 's' : ''}
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSaveAll}
-              disabled={products.length === 0 || saving}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Guardando...
-                </>
-              ) : (
-                'Guardar Todo'
-              )}
-            </button>
-          </div>
         </div>
       </div>
-    </div>
+
+      {/* Footer con botón sticky */}
+      <ModalFooter className="sticky bottom-0 bg-white border-t border-gray-200">
+        <button
+          onClick={handleSaveAll}
+          disabled={products.length === 0 || saving}
+          className="w-full min-h-[44px] px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 touch-manipulation"
+        >
+          {saving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Guardando...
+            </>
+          ) : (
+            'Guardar Todo'
+          )}
+        </button>
+      </ModalFooter>
+    </Modal>
   )
 }
 
