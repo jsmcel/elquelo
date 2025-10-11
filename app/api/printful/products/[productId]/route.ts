@@ -89,7 +89,6 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
     'front_print': 'front',
     'front_center': 'front',
     'front center': 'front',
-    'front_large': 'front',  // ← AGREGAR: front_large = front
     'back': 'back',
     'back_print': 'back',
     'back_center': 'back',
@@ -110,6 +109,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
   // PASO 2: Labels claros en español
   const PLACEMENT_LABELS: Record<string, string> = {
     'front': 'Frente',
+    'front_large': 'Frente Grande',
     'back': 'Espalda',
     'sleeve_left': 'Manga Izquierda',
     'sleeve_right': 'Manga Derecha',
@@ -220,7 +220,20 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
     })
   }
 
-  return Array.from(resultMap.values())
+  // PASO 5: Detectar y resolver placements conflictivos
+  const finalPlacements = Array.from(resultMap.values())
+  
+  // Detectar conflictos front/front_large
+  const hasFront = finalPlacements.some(p => p.placement === 'front')
+  const hasFrontLarge = finalPlacements.some(p => p.placement === 'front_large')
+  
+  if (hasFront && hasFrontLarge) {
+    console.log('⚠️ Detectado conflicto: front y front_large presentes')
+    // Mantener solo front_large (más grande) y eliminar front
+    return finalPlacements.filter(p => p.placement !== 'front')
+  }
+  
+  return finalPlacements
 }
 
 function normalizeVariants(variants: any[] | undefined) {
