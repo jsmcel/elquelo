@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Sparkles, Zap, Wrench, ArrowRight, Check } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { Modal, ModalFooter } from '@/components/ui/Modal'
 
 interface QuickStartWizardProps {
   eventId: string
@@ -105,18 +106,19 @@ export function QuickStartWizard({ eventId, onComplete, onClose }: QuickStartWiz
 
   if (step === 'applying') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-        <div className="max-w-md w-full bg-white rounded-2xl p-8 text-center">
+      <Modal
+        isOpen={true}
+        onClose={() => {}} // No se puede cerrar durante la aplicación
+        title="Configurando tu evento..."
+        description={`${selectedPkg?.name} - ${selectedPkg?.duration}`}
+        size="md"
+        showCloseButton={false}
+      >
+        <div className="text-center">
           <div className="mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 mb-4">
               <div className="animate-spin h-8 w-8 border-4 border-white border-t-transparent rounded-full"></div>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
-              Configurando tu evento...
-            </h3>
-            <p className="text-sm text-gray-600">
-              {selectedPkg?.name} - {selectedPkg?.duration}
-            </p>
           </div>
 
           <div className="space-y-2 text-left">
@@ -128,77 +130,66 @@ export function QuickStartWizard({ eventId, onComplete, onClose }: QuickStartWiz
             ))}
           </div>
         </div>
-      </div>
+      </Modal>
     )
   }
 
 
   if (step === 'done') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="relative w-full max-w-4xl rounded-3xl bg-white shadow-2xl p-8">
+      <Modal
+        isOpen={true}
+        onClose={() => {
+          setResultSummary(null)
+          onComplete()
+        }}
+        title="Paquete Express aplicado"
+        description="Ya puedes seguir personalizando el evento."
+        size="xl"
+      >
+        <div className="text-center mb-6">
+          <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl">⚡</div>
+        </div>
+
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          <SummaryCard label="Módulos activados" value={resultSummary?.modulesActivated ?? 0} />
+          <SummaryCard label="Retos creados" value={resultSummary?.retosCreated ?? 0} />
+        </div>
+
+        <ModalFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
           <button
+            type="button"
+            onClick={() => {
+              setResultSummary(null)
+              setStep('select')
+            }}
+            className="w-full sm:w-auto min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 border border-gray-300 touch-manipulation"
+          >
+            Configurar otro paquete
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setResultSummary(null)
               onComplete()
             }}
-            className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-            aria-label="Cerrar"
+            className="w-full sm:w-auto min-h-[44px] rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 touch-manipulation"
           >
-            ×
+            Ver cambios
           </button>
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl">⚡</div>
-            <h2 className="text-2xl font-bold text-gray-900">Paquete Express aplicado</h2>
-            <p className="mt-1 text-sm text-gray-600">Ya puedes seguir personalizando el evento.</p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <SummaryCard label="Módulos activados" value={resultSummary?.modulesActivated ?? 0} />
-            <SummaryCard label="Retos creados" value={resultSummary?.retosCreated ?? 0} />
-          </div>
-
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setResultSummary(null)
-                setStep('select')
-              }}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
-            >
-              Configurar otro paquete
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setResultSummary(null)
-                onComplete()
-              }}
-              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
-            >
-              Ver cambios
-            </button>
-          </div>
-        </div>
-      </div>
+        </ModalFooter>
+      </Modal>
     )
   }
 
   if (step === 'confirm' && selectedPkg) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-        <div className="relative max-w-2xl w-full bg-white rounded-2xl p-8">
-          <button
-            onClick={() => onClose?.()}
-            className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-            aria-label="Cerrar"
-          >
-            ×
-          </button>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Confirma tu selección
-          </h2>
+      <Modal
+        isOpen={true}
+        onClose={() => onClose?.()}
+        title="Confirma tu selección"
+        size="2xl"
+      >
 
           <div className={`rounded-xl bg-gradient-to-br ${selectedPkg.color} p-6 text-white mb-6`}>
             <div className="text-4xl mb-3">{selectedPkg.icon}</div>
@@ -227,72 +218,57 @@ export function QuickStartWizard({ eventId, onComplete, onClose }: QuickStartWiz
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep('select')}
-              className="flex-1 px-6 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-            >
-              ← Volver
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={isApplying}
-              className={`flex-1 px-6 py-3 rounded-xl bg-gradient-to-br ${selectedPkg.color} text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50`}
-            >
-              {isApplying ? 'Aplicando...' : `Aplicar ${selectedPkg.name}`}
-            </button>
-          </div>
-        </div>
-      </div>
+        <ModalFooter className="flex flex-col-reverse sm:flex-row gap-3">
+          <button
+            onClick={() => setStep('select')}
+            className="w-full sm:w-auto min-h-[44px] px-6 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 touch-manipulation"
+          >
+            ← Volver
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={isApplying}
+            className={`w-full sm:w-auto min-h-[44px] px-6 py-3 rounded-xl bg-gradient-to-br ${selectedPkg.color} text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50 touch-manipulation`}
+          >
+            {isApplying ? 'Aplicando...' : `Aplicar ${selectedPkg.name}`}
+          </button>
+        </ModalFooter>
+      </Modal>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-5xl rounded-3xl border-2 border-gray-200 bg-white shadow-2xl overflow-hidden">
-        <button
-          onClick={() => onClose?.()}
-          className="absolute right-4 top-4 z-10 rounded-full bg-white/20 px-3 py-1 text-sm font-semibold text-white hover:bg-white/30"
-          aria-label="Cerrar"
-        >
-          Cerrar
-        </button>
-        {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-8 text-white text-center">
-          <Sparkles className="h-12 w-12 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold mb-2">Quick Start</h2>
-          <p className="text-lg opacity-90">
-            Elige tu nivel de esfuerzo
-          </p>
-        </div>
-
-        {/* Packages Grid */}
-        <div className="p-8">
-          <div className="grid gap-4 md:grid-cols-3">
-            {QUICK_START_PACKAGES.map((pkg) => (
-              <button
-                type="button"
-                key={pkg.id}
-                onClick={() => handleSelectPackage(pkg.id)}
-                className={`rounded-2xl border-2 px-6 py-5 text-left transition-all hover:scale-[1.02] hover:shadow-lg ${
-                  selectedPackage === pkg.id
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200 bg-white hover:border-primary-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-3xl">{pkg.icon}</div>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">{pkg.duration}</span>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">{pkg.name}</h3>
-                <p className="text-sm text-gray-600 mt-2">{pkg.subtitle}</p>
-              </button>
-            ))}
-          </div>
-        </div>
+    <Modal
+      isOpen={true}
+      onClose={() => onClose?.()}
+      title="Quick Start"
+      description="Elige tu nivel de esfuerzo"
+      size="5xl"
+    >
+      {/* Packages Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        {QUICK_START_PACKAGES.map((pkg) => (
+          <button
+            type="button"
+            key={pkg.id}
+            onClick={() => handleSelectPackage(pkg.id)}
+            className={`min-h-[44px] rounded-2xl border-2 px-6 py-5 text-left transition-all hover:scale-[1.02] hover:shadow-lg touch-manipulation ${
+              selectedPackage === pkg.id
+                ? 'border-primary-500 bg-primary-50'
+                : 'border-gray-200 bg-white hover:border-primary-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-3xl">{pkg.icon}</div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">{pkg.duration}</span>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">{pkg.name}</h3>
+            <p className="text-sm text-gray-600 mt-2">{pkg.subtitle}</p>
+          </button>
+        ))}
       </div>
-    </div>
+    </Modal>
   )
 }
 
