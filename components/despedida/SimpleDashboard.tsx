@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import NextImage from 'next/image'
+import { Modal, ModalFooter } from '@/components/ui/Modal'
 import { 
   QrCode, 
   Calendar, 
@@ -633,60 +634,61 @@ function QRSchedulerWrapper({ qrId, eventId, event, onUpdate }: any) {
       />
 
       {pendingDestination && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Programar contenido</h3>
-            <p className="mt-1 text-sm text-gray-600">
-              {pendingDestination.label || 'Nueva experiencia'}
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Fecha y hora de inicio</label>
-                <input
-                  type="datetime-local"
-                  value={scheduleForm.startAt}
-                  onChange={(e) => setScheduleForm((prev) => ({ ...prev, startAt: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Fecha y hora de fin</label>
-                <input
-                  type="datetime-local"
-                  value={scheduleForm.endAt}
-                  onChange={(e) => setScheduleForm((prev) => ({ ...prev, endAt: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-                <p className="mt-1 text-xs text-gray-500">Deja vacío para mantenerlo activo hasta que programes otro contenido.</p>
-              </div>
+        <Modal
+          isOpen={true}
+          onClose={handleCancelSchedule}
+          title="Programar contenido"
+          description={pendingDestination.label || 'Nueva experiencia'}
+          size="md"
+        >
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm sm:text-xs font-semibold text-gray-700 mb-1">Fecha y hora de inicio</label>
+              <input
+                type="datetime-local"
+                value={scheduleForm.startAt}
+                onChange={(e) => setScheduleForm((prev) => ({ ...prev, startAt: e.target.value }))}
+                className="w-full min-h-[44px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 touch-manipulation"
+              />
+            </div>
+            <div>
+              <label className="block text-sm sm:text-xs font-semibold text-gray-700 mb-1">Fecha y hora de fin</label>
+              <input
+                type="datetime-local"
+                value={scheduleForm.endAt}
+                onChange={(e) => setScheduleForm((prev) => ({ ...prev, endAt: e.target.value }))}
+                className="w-full min-h-[44px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 touch-manipulation"
+              />
+              <p className="mt-1 text-xs text-gray-500">Deja vacío para mantenerlo activo hasta que programes otro contenido.</p>
+            </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <ModalFooter className="flex flex-col gap-3">
+            {scheduleError && (
+              <p className="text-xs text-rose-600">{scheduleError}</p>
+            )}
+            {!scheduleError && scheduleWarning && (
+              <p className="text-xs text-amber-600">{scheduleWarning}</p>
+            )}
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
               <button
                 type="button"
                 onClick={handleCancelSchedule}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                className="w-full sm:w-auto min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 border border-gray-300 touch-manipulation"
               >
                 Cancelar
               </button>
-              {scheduleError && (
-                <p className="text-xs text-rose-600 text-right">{scheduleError}</p>
-              )}
-              {!scheduleError && scheduleWarning && (
-                <p className="text-xs text-amber-600 text-right">{scheduleWarning}</p>
-              )}
               <button
                 type="button"
                 onClick={handleSubmitScheduledContent}
-                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full sm:w-auto min-h-[44px] rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 touch-manipulation"
                 disabled={scheduleSubmitting || !!scheduleError}
               >
                 {scheduleSubmitting ? 'Guardando...' : 'Guardar programación'}
               </button>
             </div>
-          </div>
-        </div>
+          </ModalFooter>
+        </Modal>
       )}
     </div>
   )
