@@ -89,6 +89,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
     'front_print': 'front',
     'front_center': 'front',
     'front center': 'front',
+    'front_large': 'front',  // ← AGREGAR: front_large = front
     'back': 'back',
     'back_print': 'back',
     'back_center': 'back',
