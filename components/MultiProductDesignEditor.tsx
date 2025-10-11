@@ -126,6 +126,8 @@ export function MultiProductDesignEditor({
       title="Productos del QR"
       description={`Código: ${qrCode}`}
       size="6xl"
+      closeOnBackdrop={false}
+      closeOnEscape={false}
     >
       {/* Content - Grid de productos por categorías */}
       <div className="flex-1 overflow-y-auto p-6">

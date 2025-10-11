@@ -1835,7 +1835,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           })
           next[variantId] = placementsForVariant
           
-          // GUARDAR EN CACH� el mockup reci�n generado
+          // GUARDAR EN CACHÉ el mockup recién generado
           const currentHash = hashDesign(designsByPlacement)
           const mockupsForCache: Record<string, string> = {}
           Object.entries(placementsForVariant).forEach(([placement, data]) => {
@@ -1844,60 +1844,14 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
             }
           })
           saveMockupToCache(variantId, currentHash, mockupsForCache)
-          console.log('?? Mockup saved to cache for variant', variantId)
+          console.log('✅ Mockup saved to cache for variant', variantId)
           
           return next
         })
         setGeneratingMockup(false)
         activeTaskRef.current = null
         setStatusMessage(data.message || 'Mockup generado con éxito')
-        toast.success('Mockup generado con éxito')
-        
-        // RE-GUARDAR el diseño con los mockups actualizados
-        console.log('🔄 Re-guardando diseño con mockups actualizados...')
-        
-        // Usar un timeout para asegurar que el estado se haya actualizado
-        setTimeout(() => {
-          const updatedPayload = {
-            editorType: 'printful',
-            qrCode,
-            savedAt: new Date().toISOString(),
-            designsByPlacement,
-            designMetadata,
-            variantMockups, // Usar el estado actualizado
-            selectedVariantId,
-            productId: productData?.productId || 71,
-            slug: String(selectedProductId),
-            productName: productData?.name || 'Producto',
-            printfulProduct: {
-              productId: productData?.productId || 71,
-              templateId: productData?.templateId || 71,
-              name: productData?.name || 'Producto',
-              variantId: selectedVariantId,
-            },
-            printful: {
-              productId: productData?.productId || 71,
-              templateId: productData?.templateId || 71,
-              productName: productData?.name || 'Producto',
-              source: productData?.source || 'printful',
-              variantId: selectedVariantId,
-              size: selectedVariant?.size || selectedSize || null,
-              color: selectedVariant?.colorName || null,
-              colorCode: selectedVariant?.colorCode || selectedColorCode || null,
-              placements: Object.fromEntries(
-                Object.entries(designsByPlacement).map(([placement, url]) => [placement, { imageUrl: url || null }])
-              ),
-              designMetadata,
-              variantMockups, // Usar el estado actualizado
-              activePlacement,
-              lastMessage: statusMessage,
-            },
-          }
-          
-          // Llamar a onSave con los mockups actualizados
-          onSave(updatedPayload)
-          console.log('✅ Diseño re-guardado con mockups')
-        }, 100)
+        toast.success('Mockup generado con éxito', { id: 'mockup-generation' })
         return
       }
 
@@ -1918,12 +1872,12 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!productData) return
     
-    // NUEVA VALIDACI�N: QR obligatorio
+    // NUEVA VALIDACIÓN: QR obligatorio
     if (!qrPlaced) {
-      toast.error('?? Debes colocar el QR en al menos una �rea del producto')
+      toast.error('❌ Debes colocar el QR en al menos una área del producto')
       return
     }
     
@@ -1934,13 +1888,56 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       return
     }
 
+    // Verificar que hay una variante seleccionada
+    if (!selectedVariantId) {
+      toast.error('Debes seleccionar una talla y color')
+      return
+    }
+
+    // PRIMERO: Generar el mockup si no existe o no está actualizado
+    const designHash = hashDesign(designsByPlacement)
+    const cachedMockup = getCachedMockup(selectedVariantId, designHash)
+    
+    let finalMockups = variantMockups
+    
+    // Si no hay mockup en caché o está desactualizado, generar uno nuevo
+    if (!cachedMockup || Object.keys(cachedMockup).length === 0) {
+      toast.loading('Generando mockup oficial de Printful...', { id: 'mockup-save' })
+      
+      try {
+        // Generar mockup y esperar a que termine
+        const mockups = await generateMockupAndWait()
+        if (mockups) {
+          finalMockups = mockups
+          toast.success('¡Mockup generado con éxito!', { id: 'mockup-save' })
+        } else {
+          toast.dismiss('mockup-save')
+          toast('No se pudo generar el mockup, pero el diseño se guardará', { icon: '⚠️' })
+        }
+      } catch (error) {
+        console.error('Error generando mockup:', error)
+        toast.dismiss('mockup-save')
+        toast('Error al generar mockup, pero el diseño se guardará', { icon: '⚠️' })
+      }
+    } else {
+      // Usar mockup de caché
+      finalMockups = {
+        ...variantMockups,
+        [selectedVariantId]: Object.fromEntries(
+          Object.entries(cachedMockup).map(([placement, url]) => [placement, { url }])
+        )
+      }
+      console.log('📦 Usando mockup de caché')
+    }
+
+    // SEGUNDO: Guardar el diseño con el mockup incluido
     const payload = {
       editorType: 'printful',
       qrCode,
       savedAt: new Date().toISOString(),
       designsByPlacement,
       designMetadata,
-      variantMockups,
+      variantMockups: finalMockups,
       selectedVariantId,
       productId: productData.productId,
       slug: String(selectedProductId),
@@ -1964,25 +1961,151 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           Object.entries(designsByPlacement).map(([placement, url]) => [placement, { imageUrl: url || null }])
         ),
         designMetadata,
-        variantMockups,
+        variantMockups: finalMockups,
         activePlacement,
         lastMessage: statusMessage,
       },
     }
 
-    console.log('?? [PrintfulDesignEditor] Guardando designsByPlacement:', designsByPlacement)
-    console.log('?? [PrintfulDesignEditor] Payload completo:', JSON.stringify(payload, null, 2))
-    console.log('?? [PrintfulDesignEditor] Llamando onSave con payload')
-    onSave(payload)
-    console.log('💾 [PrintfulDesignEditor] onSave llamado exitosamente')
+    console.log('💾 [PrintfulDesignEditor] Guardando diseño con mockups:', finalMockups)
+    console.log('💾 [PrintfulDesignEditor] Payload completo:', JSON.stringify(payload, null, 2))
     
-    // Mostrar mensaje de que se está generando el mockup
-    toast.success('Diseño guardado. Generando mockup oficial...')
+    // Guardar el diseño
+    await onSave(payload)
     
-    // GENERAR MOCKUP AUTOMÁTICAMENTE
-    handleGenerateMockup()
+    // Mostrar éxito y cerrar
+    toast.success('✅ Diseño guardado con éxito')
+    
+    // Cerrar el modal después de guardar
+    setTimeout(() => {
+      onClose()
+    }, 500) // Pequeño delay para que el usuario vea el mensaje de éxito
   }
   
+  // Nueva función que genera mockup y espera a que termine (retorna Promise)
+  const generateMockupAndWait = async (): Promise<VariantMockups | null> => {
+    if (!productData || !selectedVariantId) {
+      return null
+    }
+    
+    // Construir payload para generar mockup
+    const files = buildFilesPayload()
+    if (files.length === 0) {
+      return null
+    }
+    
+    try {
+      // Iniciar tarea de mockup
+      const response = await fetch('/api/printful/mockup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productData.productId,
+          variantIds: [selectedVariantId],
+          files,
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'No pudimos iniciar la generación del mockup')
+      }
+      
+      const requestId = data.requestId
+      console.log('🎨 Mockup task iniciado:', requestId)
+      
+      // Polling con Promise
+      const maxAttempts = 30 // 30 intentos = 1 minuto
+      const pollInterval = 2000 // 2 segundos
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        
+        const statusResponse = await fetch(`/api/printful/mockup?requestId=${encodeURIComponent(requestId)}`)
+        const statusData = await statusResponse.json()
+        
+        if (!statusResponse.ok || !statusData.success) {
+          continue
+        }
+        
+        if (statusData.status === 'completed') {
+          const normalized = Array.isArray(statusData.normalizedMockups) ? statusData.normalizedMockups : []
+          const rawMockups = Array.isArray(statusData.mockups) ? statusData.mockups : []
+          
+          const placementsForVariant: Record<string, { url: string; raw?: any }> = {}
+          
+          normalized.forEach((item: any) => {
+            if (!item?.placement || !item?.url) {
+              return
+            }
+
+            const placementKey = normalizePlacementCode(item.placement)
+            if (!placementKey) {
+              return
+            }
+
+            const matchesVariant = Number.isNaN(item.variantId) || item.variantId === selectedVariantId
+            if (!matchesVariant) {
+              return
+            }
+
+            const rawEntry = rawMockups.find((mock: any) => {
+              const placementMatch =
+                normalizePlacementCode(mock?.placement || mock?.print_area || mock?.printPlacement) === placementKey
+              if (!placementMatch) {
+                return false
+              }
+              if (Number.isNaN(item.variantId)) {
+                return true
+              }
+              if (Array.isArray(mock.variant_ids)) {
+                return mock.variant_ids.some((id: any) => Number(id) === selectedVariantId)
+              }
+              const numeric = Number(mock.variant_id ?? mock.variantId)
+              return !Number.isNaN(numeric) && numeric === selectedVariantId
+            })
+
+            placementsForVariant[placementKey] = { url: item.url, raw: rawEntry }
+          })
+          
+          // Guardar en caché
+          const currentHash = hashDesign(designsByPlacement)
+          const mockupsForCache: Record<string, string> = {}
+          Object.entries(placementsForVariant).forEach(([placement, data]) => {
+            if (data?.url) {
+              mockupsForCache[placement] = data.url
+            }
+          })
+          saveMockupToCache(selectedVariantId, currentHash, mockupsForCache)
+          console.log('✅ Mockup generado y guardado en caché')
+          
+          // Actualizar el estado
+          const updatedMockups = {
+            ...variantMockups,
+            [selectedVariantId]: placementsForVariant
+          }
+          setVariantMockups(updatedMockups)
+          
+          return updatedMockups
+        }
+        
+        if (statusData.status === 'failed') {
+          console.error('❌ Mockup generation failed')
+          return null
+        }
+      }
+      
+      // Timeout
+      console.error('⏱️ Mockup generation timeout')
+      return null
+      
+    } catch (error) {
+      console.error('Error generating mockup:', error)
+      return null
+    }
+  }
+
   const handleGenerateMockup = async () => {
     if (!productData || !selectedVariantId) {
       toast.error('Selecciona una talla y color para generar el mockup')
@@ -2056,15 +2179,17 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       isOpen={true}
       onClose={() => {
         if (generatingMockup) {
-          toast.error('Espera a que termine la generacieeen del mockup')
+          toast.error('Espera a que termine la generación del mockup')
           return
         }
         onClose()
       }}
-      title={productData?.name || 'Dise�ador de Producto'}
+      title={productData?.name || 'Diseñador de Producto'}
       description={`QR: ${qrCode}`}
       size="7xl"
       fullHeight={true}
+      closeOnBackdrop={false}
+      closeOnEscape={false}
     >
       <div className="space-y-6">
         {/* Header compacto - menos prominente */}

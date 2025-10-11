@@ -656,8 +656,8 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     if (editingQR) {
       await uploadDesignToServer(editingQR.code, designData)
     }
-    setEditorOpen(false)
-    setEditingQR(null)
+    // NO cerrar el modal aquí - el editor lo cierra automáticamente después de guardar
+    // Esto evita cierres prematuros durante la generación de mockups
   }
 
   // Nuevo: Abrir editor individual para un producto específico
@@ -1369,8 +1369,11 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                             <QRProductsList 
                               designData={designState.designData}
                               onAddProduct={() => {
+                                // Crear ID temporal para el nuevo producto y abrir directamente el catálogo
+                                const newProductId = crypto.randomUUID ? crypto.randomUUID() : `product-${Date.now()}`
                                 setEditingQR(qr)
                                 setEditorOpen(true)
+                                setEditingProductId(newProductId)
                               }}
                               onOpenTrash={() => {
                                 setTrashQRCode(qr.code)
@@ -1493,8 +1496,10 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
           qrCode={editingQR.code}
           qrContent={editingQR.qr_url}
           onClose={() => {
+            // Limpiar estado cuando se cierra el editor
             setEditorOpen(false)
             setEditingQR(null)
+            setEditingProductId(null)
           }}
           onSave={handleEditorSave}
           onEditProduct={handleOpenSingleProductEditor}
