@@ -116,6 +116,16 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
     'embroidery_left_chest': 'Bordado Pecho Izquierdo',
   }
   
+  // PASO 2b: Descripciones de cada área con dimensiones
+  const PLACEMENT_DESCRIPTIONS: Record<string, string> = {
+    'front': 'Área estándar frontal (12" × 16" / 30.5 × 40.6 cm)',
+    'front_large': 'Área frontal grande (15" × 18" / 38.1 × 45.7 cm) - Recomendado',
+    'back': 'Área trasera completa',
+    'sleeve_left': 'Área de manga izquierda',
+    'sleeve_right': 'Área de manga derecha',
+    'embroidery_left_chest': 'Bordado en el pecho izquierdo',
+  }
+  
   // Solo usar FALLBACK_PLACEMENTS si no hay datos específicos del producto
   const hasSpecificPlacements = Array.isArray(files) && files.length > 0
   const hasPrintfilesPlacements = printfilesData && printfilesData.variant_printfiles && 
@@ -156,6 +166,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
         resultMap.set(normalizedCode, {
           placement: normalizedCode,
           label,
+          description: PLACEMENT_DESCRIPTIONS[normalizedCode] || label,
           printfileId: file.id ?? file.printfile_id ?? null,
           width,
           height,
@@ -209,6 +220,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
         resultMap.set(normalizedCode, {
           placement: normalizedCode,
           label,
+          description: PLACEMENT_DESCRIPTIONS[normalizedCode] || label,
           printfileId,
           width,
           height,
@@ -220,7 +232,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
     })
   }
 
-  // PASO 5: Detectar y resolver placements conflictivos
+  // PASO 5: Marcar placements conflictivos (pero mantenerlos visibles)
   const finalPlacements = Array.from(resultMap.values())
   
   // Detectar conflictos front/front_large
@@ -229,8 +241,12 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
   
   if (hasFront && hasFrontLarge) {
     console.log('⚠️ Detectado conflicto: front y front_large presentes')
-    // Mantener solo front_large (más grande) y eliminar front
-    return finalPlacements.filter(p => p.placement !== 'front')
+    // Marcar como conflictivos pero mantener ambos visibles
+    return finalPlacements.map(placement => ({
+      ...placement,
+      isConflicting: placement.placement === 'front', // Marcar front como conflictivo
+      conflictMessage: placement.placement === 'front' ? 'Conflicto con Frente Grande' : undefined
+    }))
   }
   
   return finalPlacements

@@ -127,6 +127,7 @@ interface PrintfulDesignEditorProps {
 interface ProductPlacement {
   placement: string
   label: string
+  description?: string
   printfileId?: number | null
   position?: {
     top?: number | null
@@ -138,6 +139,8 @@ interface ProductPlacement {
   height?: number | null
   areaWidth?: number | null
   areaHeight?: number | null
+  isConflicting?: boolean
+  conflictMessage?: string
 }
 
 interface ProductVariant {
@@ -2026,20 +2029,36 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                 const isActive = activePlacement === placement.placement
                 const hasMockup = Boolean(currentVariantMockups[placement.placement])
                 const hasDesign = Boolean(designsByPlacement[placement.placement])
+                const isConflicting = placement.isConflicting || false
+                
                 return (
-                  <button
-                    key={placement.placement}
-                    onClick={() => setActivePlacement(placement.placement)}
-                    className={`min-h-[44px] rounded-full border px-4 py-2 text-xs font-semibold transition touch-manipulation ${
-                      isActive ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-200 text-gray-700'
-                    }`}
-                  >
-                    {placement.label}
-                    {hasMockup && <Check className="ml-2 inline h-3 w-3 text-green-500" />}
-                    {!hasMockup && hasDesign && (
-                      <span className="ml-2 inline-block h-2 w-2 rounded-full bg-amber-400" />
-                    )}
-                  </button>
+                  <div key={placement.placement} className="relative group">
+                    <button
+                      onClick={() => !isConflicting && setActivePlacement(placement.placement)}
+                      disabled={isConflicting}
+                      className={`min-h-[44px] rounded-full border px-4 py-2 text-xs font-semibold transition touch-manipulation relative ${
+                        isConflicting 
+                          ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                          : isActive 
+                            ? 'border-primary-500 bg-primary-50 text-primary-600' 
+                            : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      {placement.label}
+                      {isConflicting && (
+                        <span className="ml-1 text-xs text-red-500">⚠️</span>
+                      )}
+                      {hasMockup && !isConflicting && <Check className="ml-2 inline h-3 w-3 text-green-500" />}
+                      {!hasMockup && hasDesign && !isConflicting && (
+                        <span className="ml-2 inline-block h-2 w-2 rounded-full bg-amber-400" />
+                      )}
+                    </button>
+                    {/* Tooltip Helper */}
+                    <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg whitespace-nowrap pointer-events-none">
+                      {isConflicting ? placement.conflictMessage : placement.description || placement.label}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  </div>
                 )
               })}
             </div>
