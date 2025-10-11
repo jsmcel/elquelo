@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { MICROSITE_TEMPLATES, TEMPLATE_CATEGORIES, MicrositeTemplate, getTemplatesByCategory } from '@/lib/microsite-templates'
 import { Check, Eye, Info } from 'lucide-react'
+import { Modal, ModalFooter } from '@/components/ui/Modal'
 
 interface MicrositeTemplateLibraryProps {
   onSelectTemplate: (template: MicrositeTemplate) => void
@@ -34,7 +35,7 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setSelectedCategory('all')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+          className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-medium transition-colors touch-manipulation ${
             selectedCategory === 'all'
               ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -46,7 +47,7 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
           <button
             key={key}
             onClick={() => setSelectedCategory(key as keyof typeof TEMPLATE_CATEGORIES)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-medium transition-colors touch-manipulation ${
               selectedCategory === key
                 ? 'bg-primary-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -58,7 +59,7 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
       </div>
 
       {/* Grid de plantillas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTemplates.map((template) => {
           const isSelected = template.id === currentTemplateId
 
@@ -126,19 +127,19 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
                 </div>
 
                 {/* Acciones */}
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       setPreviewTemplate(template)
                     }}
-                    className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 touch-manipulation"
                   >
                     <Eye className="h-3 w-3" /> Ver
                   </button>
                   <button
                     onClick={() => onSelectTemplate(template)}
-                    className={`flex-1 inline-flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                    className={`flex-1 min-h-[44px] inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold touch-manipulation ${
                       isSelected
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-900 text-white hover:bg-gray-800'
@@ -156,37 +157,26 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
 
       {/* Preview Modal */}
       {previewTemplate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-          onClick={() => setPreviewTemplate(null)}
+        <Modal
+          isOpen={true}
+          onClose={() => setPreviewTemplate(null)}
+          title={previewTemplate.name}
+          description={previewTemplate.description}
+          size="2xl"
         >
-          <div
-            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setPreviewTemplate(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
 
-            <div className="space-y-4">
-              {/* Header */}
-              <div className="flex items-start gap-4">
-                <div
-                  className="flex h-16 w-16 items-center justify-center rounded-xl text-3xl"
-                  style={{
-                    background: `linear-gradient(135deg, ${previewTemplate.colors.primary} 0%, ${previewTemplate.colors.secondary} 100%)`,
-                  }}
-                >
-                  {previewTemplate.preview}
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-gray-900">{previewTemplate.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{previewTemplate.description}</p>
-                </div>
+          <div className="space-y-4">
+            {/* Preview Icon */}
+            <div className="flex justify-center">
+              <div
+                className="flex h-20 w-20 items-center justify-center rounded-xl text-4xl"
+                style={{
+                  background: `linear-gradient(135deg, ${previewTemplate.colors.primary} 0%, ${previewTemplate.colors.secondary} 100%)`,
+                }}
+              >
+                {previewTemplate.preview}
               </div>
+            </div>
 
               {/* Detalles */}
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
@@ -201,24 +191,24 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
 
                 <div>
                   <h4 className="text-xs font-semibold text-gray-700 uppercase">Colores</h4>
-                  <div className="flex gap-3 mt-2">
+                  <div className="flex justify-center gap-4 mt-2">
                     <div className="text-center">
                       <div
-                        className="h-10 w-10 rounded-lg border border-gray-200 mx-auto"
+                        className="h-12 w-12 rounded-lg border border-gray-200 mx-auto"
                         style={{ backgroundColor: previewTemplate.colors.primary }}
                       />
                       <p className="text-xs text-gray-600 mt-1">Primario</p>
                     </div>
                     <div className="text-center">
                       <div
-                        className="h-10 w-10 rounded-lg border border-gray-200 mx-auto"
+                        className="h-12 w-12 rounded-lg border border-gray-200 mx-auto"
                         style={{ backgroundColor: previewTemplate.colors.secondary }}
                       />
                       <p className="text-xs text-gray-600 mt-1">Secundario</p>
                     </div>
                     <div className="text-center">
                       <div
-                        className="h-10 w-10 rounded-lg border border-gray-200 mx-auto"
+                        className="h-12 w-12 rounded-lg border border-gray-200 mx-auto"
                         style={{ backgroundColor: previewTemplate.colors.accent }}
                       />
                       <p className="text-xs text-gray-600 mt-1">Acento</p>
@@ -261,19 +251,18 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
                 </div>
               </div>
 
-              {/* Botón de acción */}
-              <button
-                onClick={() => {
-                  onSelectTemplate(previewTemplate)
-                  setPreviewTemplate(null)
-                }}
-                className="w-full rounded-xl bg-primary-600 px-4 py-3 font-semibold text-white hover:bg-primary-700"
-              >
-                Usar esta plantilla
-              </button>
-            </div>
-          </div>
-        </div>
+          <ModalFooter>
+            <button
+              onClick={() => {
+                onSelectTemplate(previewTemplate)
+                setPreviewTemplate(null)
+              }}
+              className="w-full min-h-[44px] rounded-xl bg-primary-600 px-4 py-3 font-semibold text-white hover:bg-primary-700 touch-manipulation"
+            >
+              Usar esta plantilla
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
     </div>
   )
