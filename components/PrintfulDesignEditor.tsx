@@ -1856,65 +1856,6 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     }
   }
 
-  const requestMockup = async () => {
-    if (!productData || !selectedVariantId) return
-    
-    // Calcular hash del diseño actual
-    const currentHash = hashDesign(designsByPlacement)
-    
-    // PASO 1: Verificar caché primero
-    const cached = getCachedMockup(selectedVariantId, currentHash)
-    if (cached) {
-      console.log('✅ Using cached mockup for variant', selectedVariantId)
-      // Convertir cached (Record<string, string>) a VariantMockups format
-      const cachedWithFormat: Record<string, { url: string; raw?: any }> = {}
-      Object.entries(cached).forEach(([placement, url]) => {
-        cachedWithFormat[placement] = { url, raw: undefined }
-      })
-      setVariantMockups(prev => ({
-        ...prev,
-        [selectedVariantId]: cachedWithFormat
-      }))
-      toast.success('Mockup cargado desde caché')
-      return
-    }
-    
-    // PASO 2: Si no hay caché, generar nuevo mockup
-    const files = buildFilesPayload()
-    if (!files.length) {
-      toast.error('Sube al menos un diseño antes de generar el mockup')
-      return
-    }
-
-    console.log('🔄 Generating new mockup for variant', selectedVariantId)
-    setGeneratingMockup(true)
-    setStatusMessage(null)
-
-    try {
-      const response = await fetch('/api/printful/mockup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: productData.productId,
-          variantIds: [selectedVariantId],
-          files,
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok || !data.success || !data.requestId) {
-        throw new Error(data.error || 'No se aceptó la tarea de mockup')
-      }
-
-      activeTaskRef.current = { key: data.requestId, variantId: selectedVariantId }
-      pollMockupStatus(data.requestId, selectedVariantId, 0)
-    } catch (error) {
-      console.error('Error generating mockup in Printful', error)
-      setGeneratingMockup(false)
-      activeTaskRef.current = null
-      toast.error(error instanceof Error ? error.message : 'No pudimos solicitar el mockup')
-    }
-  }
   const handleSave = () => {
     if (!productData) return
     
@@ -2107,14 +2048,9 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                     Diseeeeo listo para{' '}
                     {placementList.find((item) => item.placement === activePlacement)?.label || activePlacement}.
                   </p>
-                  <button
-                    onClick={requestMockup}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white"
-                    disabled={generatingMockup}
-                  >
-                    {generatingMockup ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    {generatingMockup ? 'Generando...' : 'Generar mockup'}
-                  </button>
+                  <p className="mt-2 text-xs text-gray-500">
+                    El mockup se generará automáticamente al guardar el diseño.
+                  </p>
                 </div>
               ) : (
                 <div className="text-center text-sm text-gray-500">
@@ -2181,19 +2117,15 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                   </p>
                   <div className="flex gap-2">
                     <button
-                      onClick={requestMockup}
-                      className="inline-flex items-center gap-2 rounded-full border border-green-300 px-3 py-1 text-xs font-semibold text-green-700"
-                      disabled={generatingMockup}
-                    >
-                      <RefreshCw className="h-3 w-3" /> Generar mockup
-                    </button>
-                    <button
                       onClick={() => handleRemoveDesign(activePlacement)}
                       className="inline-flex items-center gap-2 rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-600"
                     >
                       Quitar
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500">
+                    El mockup se generará automáticamente al guardar el diseño.
+                  </p>
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">
@@ -2273,7 +2205,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
             disabled={!qrPlaced || generatingMockup || uploading}
             className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
           >
-            {!qrPlaced ? '⚠️ Coloca el QR primero' : 'Guardar diseño'}
+            {!qrPlaced ? '⚠️ Coloca el QR primero' : 'Guardar diseño y generar mockup'}
           </button>
         </div>
       </ModalFooter>
