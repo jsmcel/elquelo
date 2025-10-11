@@ -3,6 +3,9 @@ interface PackageProduct {
   defaultVariantId: number
   placement: string
   name: string
+  defaultSize?: string // Talla por defecto
+  defaultColor?: string // Color por defecto
+  defaultColorCode?: string // Código de color por defecto
   estimatedPrice?: number // Precio estimado en euros (para referencia)
 }
 
@@ -30,6 +33,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
       defaultVariantId: 4013, // M White
       placement: 'front',
       name: 'Bella Canvas 3001',
+      defaultSize: 'M',
+      defaultColor: 'White',
+      defaultColorCode: '#FFFFFF',
       estimatedPrice: 14
     }],
     category: 'essential',
@@ -46,6 +52,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
       defaultVariantId: 18759, // M Ash
       placement: 'front',
       name: 'Gildan 18000',
+      defaultSize: 'M',
+      defaultColor: 'Ash',
+      defaultColorCode: '#B2B2B2',
       estimatedPrice: 29
     }],
     category: 'essential',
@@ -63,6 +72,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar 11oz variant
         placement: 'default', 
         name: 'Taza 11oz',
+        defaultSize: '11oz',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 14
       },
       { 
@@ -70,6 +82,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar variant
         placement: 'front', 
         name: 'Gorra 5 Panel',
+        defaultSize: 'One size',
+        defaultColor: 'Black',
+        defaultColorCode: '#000000',
         estimatedPrice: 21
       },
       { 
@@ -77,6 +92,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 16030, // Black 17oz
         placement: 'default', 
         name: 'Botella Stainless Steel',
+        defaultSize: '17oz',
+        defaultColor: 'Black',
+        defaultColorCode: '#000000',
         estimatedPrice: 18
       }
     ],
@@ -97,6 +115,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar 11oz variant
         placement: 'default', 
         name: 'Taza 11oz',
+        defaultSize: '11oz',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 14
       },
       { 
@@ -104,6 +125,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, 
         placement: 'default', 
         name: 'Tote Bag',
+        defaultSize: 'One size',
+        defaultColor: 'Natural',
+        defaultColorCode: '#F5F5DC',
         estimatedPrice: 16
       },
       { 
@@ -111,6 +135,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar variant
         placement: 'front', 
         name: 'Libreta Spiral',
+        defaultSize: '5.5"×8.5"',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 12
       }
     ],
@@ -130,6 +157,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
       defaultVariantId: 0,
       placement: 'front',
       name: "Women's Crew Neck T-Shirt",
+      defaultSize: 'M',
+      defaultColor: 'White',
+      defaultColorCode: '#FFFFFF',
       estimatedPrice: 20
     }],
     category: 'special',
@@ -143,10 +173,13 @@ export const PACKAGES: Record<string, PackageConfig> = {
     emoji: '🔥',
     description: 'Crop Top para despedidas atrevidas',
     products: [{
-      productId: 0, // Buscar Crop Top ID
+      productId: 242,
       defaultVariantId: 0,
       placement: 'front',
       name: 'Crop Top',
+      defaultSize: 'M',
+      defaultColor: 'White',
+      defaultColorCode: '#FFFFFF',
       estimatedPrice: 25
     }],
     category: 'premium',
@@ -164,6 +197,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar Large variant
         placement: 'default', 
         name: 'Beach Towel Large',
+        defaultSize: 'One size',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 35
       },
       { 
@@ -171,6 +207,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, 
         placement: 'default', 
         name: 'Flip-Flops',
+        defaultSize: 'M',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 25
       }
     ],
@@ -189,6 +228,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar 11oz variant
         placement: 'default', 
         name: 'Taza 11oz',
+        defaultSize: '11oz',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 14
       },
       { 
@@ -196,6 +238,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, // Buscar 12×16 variant
         placement: 'default', 
         name: 'Poster 12×16',
+        defaultSize: '12"×16"',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 18
       },
       { 
@@ -203,6 +248,9 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultVariantId: 0, 
         placement: 'default', 
         name: 'Sticker Kiss Cut',
+        defaultSize: '3"×3"',
+        defaultColor: 'White',
+        defaultColorCode: '#FFFFFF',
         estimatedPrice: 8
       }
     ],
