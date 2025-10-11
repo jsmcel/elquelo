@@ -15,6 +15,7 @@ import {
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { CamisetaPackageButton } from '@/components/CamisetaPackageButton'
+import { getAllPackages } from '@/lib/packages'
 
 interface Participant {
   id: string
@@ -44,9 +45,10 @@ export default function ConfiguratorPage() {
   const [groupName, setGroupName] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([])
+  const [selectedPackages, setSelectedPackages] = useState<string[]>(['camisetas']) // Por defecto camisetas marcado
   const [generating, setGenerating] = useState(false)
   const [camisetaPrice, setCamisetaPrice] = useState<number>(0) // Se carga de la API
+  const [packagePrices, setPackagePrices] = useState<Record<string, number>>({}) // Precios de todos los paquetes
 
   useEffect(() => {
     if (!loading && !user) {
@@ -54,28 +56,67 @@ export default function ConfiguratorPage() {
       }
   }, [user, loading, router])
 
-  // Cargar precio real de la camiseta
+  // Cargar precios de todos los paquetes
   useEffect(() => {
-    async function loadCamisetaPrice() {
+    async function loadPackagePrices() {
+      const packages = getAllPackages()
+      const allVariantIds: number[] = []
+      
+      // Recopilar todos los variantIds únicos de todos los paquetes
+      packages.forEach(pkg => {
+        pkg.products.forEach(product => {
+          if (product.defaultVariantId && product.defaultVariantId !== 0) {
+            allVariantIds.push(product.defaultVariantId)
+          }
+        })
+      })
+
+      // Añadir el variantId de camisetas que ya sabemos
+      if (!allVariantIds.includes(4013)) {
+        allVariantIds.push(4013)
+      }
+
+      if (allVariantIds.length === 0) return
+
       try {
         const response = await fetch('/api/printful/variants/price', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ variantIds: [4013] })
+          body: JSON.stringify({ variantIds: allVariantIds })
         })
 
         if (response.ok) {
           const { prices } = await response.json()
+          
+          // Calcular precios de cada paquete
+          const newPackagePrices: Record<string, number> = {}
+          
+          packages.forEach(pkg => {
+            let totalPrice = 0
+            pkg.products.forEach(product => {
+              if (product.defaultVariantId && product.defaultVariantId !== 0 && prices[product.defaultVariantId]) {
+                totalPrice += prices[product.defaultVariantId].finalPrice
+              } else {
+                // Usar precio estimado si no hay precio real
+                totalPrice += product.estimatedPrice || 0
+              }
+            })
+            newPackagePrices[pkg.id] = totalPrice
+          })
+
+          setPackagePrices(newPackagePrices)
+          
+          // También establecer el precio de camisetas para compatibilidad
           if (prices[4013]) {
             setCamisetaPrice(prices[4013].finalPrice)
           }
         }
       } catch (error) {
-        console.error('Error cargando precio de camiseta:', error)
+        console.error('Error cargando precios de paquetes:', error)
       }
     }
 
-    loadCamisetaPrice()
+    loadPackagePrices()
   }, [])
 
   const addParticipant = () => {
@@ -369,125 +410,66 @@ export default function ConfiguratorPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {/* Paquete: Camisetas para todos */}
-              <div className={`rounded-2xl border-2 p-6 cursor-pointer transition-all ${
-                selectedPackages.includes('camisetas') 
-                  ? 'border-orange-300 bg-orange-50' 
-                  : 'border-gray-200 bg-white hover:border-orange-200'
-              }`} onClick={() => {
-                if (selectedPackages.includes('camisetas')) {
-                  setSelectedPackages(prev => prev.filter(p => p !== 'camisetas'))
-                } else {
-                  setSelectedPackages(prev => [...prev, 'camisetas'])
-                }
-              }}>
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedPackages.includes('camisetas')}
-                    onChange={() => {}}
-                    className="h-5 w-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  <h3 className="text-lg font-semibold text-gray-900">🎉 ¡HAY CAMISETAS PARA TODOS!</h3>
-                </div>
-                <p className="text-sm text-gray-600 mb-3">
-                  Camiseta con QR personalizado para cada participante
-                </p>
-                <p className="text-xs text-gray-500 mb-2">
-                  ✨ Personalizable: tallas, colores, diseños
-                </p>
-                <div className="text-lg font-bold text-orange-600">
-                  {camisetaPrice > 0 ? `€${Math.round(participants.length * camisetaPrice * 100) / 100}` : 'Cargando precio...'}
-                </div>
-              </div>
-
-              {/* Paquete: Por si refresca - PRÓXIMAMENTE */}
-              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="checkbox"
-                    disabled
-                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
-                  />
-                  <h3 className="text-lg font-semibold text-gray-500">🥤 Por si refresca</h3>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
-                </div>
-                <p className="text-sm text-gray-500 mb-3">
-                  Botellas de agua personalizadas para la despedida
-                </p>
-                <p className="text-xs text-gray-400 mb-2">
-                  ✨ Personalizable: colores, diseños, cantidades
-                </p>
-                <div className="text-lg font-bold text-gray-400">
-                  Precio por calcular
-                </div>
-              </div>
-
-              {/* Paquete: Gadgets para novio/novia - PRÓXIMAMENTE */}
-              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="checkbox"
-                    disabled
-                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
-                  />
-                  <h3 className="text-lg font-semibold text-gray-500">💍 Gadgets para Novios</h3>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
-                </div>
-                <p className="text-sm text-gray-500 mb-3">
-                  Regalos especiales solo para los novios/novias
-                </p>
-                <p className="text-xs text-gray-400 mb-2">
-                  ✨ Personalizable: productos, diseños, cantidades
-                </p>
-                <div className="text-lg font-bold text-gray-400">
-                  Precio por calcular
-                </div>
-              </div>
-
-              {/* Paquete: Para ellas - PRÓXIMAMENTE */}
-              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="checkbox"
-                    disabled
-                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
-                  />
-                  <h3 className="text-lg font-semibold text-gray-500">👗 Para ellas</h3>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
-                </div>
-                <p className="text-sm text-gray-500 mb-3">
-                  Productos especiales para las chicas de la despedida
-                </p>
-                <p className="text-xs text-gray-400 mb-2">
-                  ✨ Personalizable: productos, tallas, colores
-                </p>
-                <div className="text-lg font-bold text-gray-400">
-                  Precio por calcular
-                </div>
-              </div>
-
-              {/* Paquete: Sexy - PRÓXIMAMENTE */}
-              <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-6 opacity-60">
-                <div className="flex items-center gap-3 mb-3">
-                  <input
-                    type="checkbox"
-                    disabled
-                    className="h-5 w-5 rounded border-gray-300 text-gray-400"
-                  />
-                  <h3 className="text-lg font-semibold text-gray-500">🔥 Sexy</h3>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">PRÓXIMAMENTE</span>
-                </div>
-                <p className="text-sm text-gray-500 mb-3">
-                  Productos atrevidos para la despedida
-                </p>
-                <p className="text-xs text-gray-400 mb-2">
-                  ✨ Personalizable: productos, tallas, colores
-                </p>
-                <div className="text-lg font-bold text-gray-400">
-                  Precio por calcular
-                </div>
-              </div>
+              {/* Renderizar todos los paquetes dinámicamente */}
+              {getAllPackages().map((pkg) => {
+                const isSelected = selectedPackages.includes(pkg.id)
+                const packagePrice = packagePrices[pkg.id] || 0
+                
+                // Calcular precio total del paquete
+                const totalPrice = packagePrice * participants.length
+                
+                return (
+                  <div 
+                    key={pkg.id}
+                    className={`rounded-2xl border-2 p-6 cursor-pointer transition-all ${
+                      isSelected 
+                        ? 'border-orange-300 bg-orange-50' 
+                        : 'border-gray-200 bg-white hover:border-orange-200'
+                    }`} 
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedPackages(prev => prev.filter(p => p !== pkg.id))
+                      } else {
+                        setSelectedPackages(prev => [...prev, pkg.id])
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="h-5 w-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <h3 className="text-lg font-semibold text-gray-900">{pkg.emoji} {pkg.title}</h3>
+                      {pkg.onlyForNoviNovia && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                          Solo Novio/Novia
+                        </span>
+                      )}
+                      {pkg.isMultiProduct && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                          Pack
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      {pkg.description}
+                    </p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      ✨ Personalizable: tallas, colores, diseños
+                    </p>
+                    <div className="text-lg font-bold text-orange-600">
+                      {packagePrice > 0 ? `€${Math.round(totalPrice * 100) / 100}` : 'Cargando precio...'}
+                      {packagePrice > 0 && participants.length > 1 && (
+                        <span className="text-sm text-gray-500 ml-2">
+                          (€{Math.round(packagePrice * 100) / 100} × {participants.length})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
 
               {/* Ningún paquete */}
               <div className={`rounded-2xl border-2 p-6 cursor-pointer transition-all ${

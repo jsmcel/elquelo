@@ -21,6 +21,21 @@ Una plataforma completa de dropshipping para camisetas con códigos QR dinámico
 - **QR**: Sistema propio con dominio corto
 - **Email**: Brevo
 
+## 🤖 Actualizaciones Automáticas
+
+El sistema actualiza automáticamente los datos de Printful:
+
+- **Catálogo de Productos**: Diariamente a las 3:00 AM UTC (~433 productos)
+- **Printfiles (Dimensiones)**: Solo cuando el catálogo cambia (~433 productos)
+
+**Características:**
+- ✅ Solo actualiza si hay cambios reales (eficiente)
+- ✅ Preserva ajustes manuales optimizados (back offset, etc.)
+- ✅ Dimensiones basadas en datos reales de Printful
+- ✅ Caché inteligente para minimizar deploys
+
+Ver más detalles en [docs/PRINTFUL_UPDATES.md](docs/PRINTFUL_UPDATES.md)
+
 ## 🛠️ Instalación
 
 1. **Clonar el repositorio**

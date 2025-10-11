@@ -1,0 +1,80 @@
+name: Update Printful Printfiles
+
+on:
+  # Se ejecuta SOLO cuando el catálogo se actualiza
+  workflow_run:
+    workflows: ["Update Printful Catalog"]
+    types:
+      - completed
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub
+
+jobs:
+  update-printfiles:
+    runs-on: ubuntu-latest
+    # Solo ejecutar si el workflow del catálogo fue exitoso
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Fetch Printful printfiles
+        env:
+          PRINTFUL_API_KEY: ${{ secrets.PRINTFUL_API_KEY }}
+          PRINTFUL_STORE_ID: ${{ secrets.PRINTFUL_STORE_ID }}
+        run: node scripts/update-printful-printfiles.mjs
+      
+      - name: Check if printfiles changed
+        id: check_changes
+        run: |
+          if git diff --quiet mocks/printful-printfiles.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit and push if changed
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add mocks/printful-printfiles.json
+          git commit -m "chore: Update Printful printfiles (automated daily update at 5 AM)"
+          git push
+      
+      - name: Trigger Vercel rebuild (if changed)
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          echo "🔄 Triggering Vercel rebuild to apply new printfiles..."
+          # Vercel detectará el cambio en el repo y redesplegará automáticamente
+          
+      - name: Summary
+        run: |
+          echo "🔗 Triggered by: Update Printful Catalog workflow"
+          echo ""
+          if [ "${{ steps.check_changes.outputs.changed }}" == "true" ]; then
+            echo "✅ Printfiles updated and pushed to repository"
+            echo "🚀 Vercel will automatically redeploy with new printfiles"
+            echo ""
+            echo "📊 What happens next:"
+            echo "  1. Vercel detects the commit"
+            echo "  2. Triggers automatic deployment"
+            echo "  3. New printfiles are loaded on next API request"
+            echo "  4. Manual optimizations are preserved (back offset, sleeves)"
+            echo "  5. Only NEW or DIFFERENT dimensions are applied"
+          else
+            echo "ℹ️  No changes in printfiles (dimensions are up to date)"
+            echo "📊 Catalog updated but printfile dimensions unchanged"
+            echo "✓ No additional deployment needed"
+          fi
+

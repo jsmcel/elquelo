@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrintfulClient } from '@/lib/printful-v2'
+import { getOptimizedPlacementsForProduct, type PlacementDimensions as OptimizedPlacement } from '@/lib/printful-dimensions'
 
 interface PlacementEntry {
   placement: string
@@ -20,13 +21,15 @@ interface PlacementEntry {
   conflictMessage?: string
 }
 
+// Dimensiones genéricas como fallback si no hay datos específicos
 const FALLBACK_PLACEMENTS: PlacementEntry[] = [
   {
     placement: 'front',
     label: 'Frente',
+    description: 'Área frontal estándar (12" × 16" / 30.5 × 40.6 cm)',
     printfileId: null,
-    width: 3600,
-    height: 4800,
+    width: 3600,  // 12 inches @ 300 DPI
+    height: 4800, // 16 inches @ 300 DPI
     areaWidth: 3600,
     areaHeight: 4800,
     position: { top: 0, left: 0, width: 3600, height: 4800 },
@@ -34,32 +37,35 @@ const FALLBACK_PLACEMENTS: PlacementEntry[] = [
   {
     placement: 'back',
     label: 'Espalda',
+    description: 'Área trasera completa (12" × 16" / 30.5 × 40.6 cm)',
     printfileId: null,
     width: 3600,
-    height: 4800,
+    height: 4000, // Reducido para mejor centrado
     areaWidth: 3600,
     areaHeight: 4800,
-    position: { top: 0, left: 0, width: 3600, height: 4800 },
+    position: { top: 800, left: 0, width: 3600, height: 4000 }, // Desplazado hacia abajo
   },
   {
     placement: 'sleeve_left',
     label: 'Manga izquierda',
+    description: 'Área de manga izquierda (4" × 3.5" / 10.2 × 8.9 cm)',
     printfileId: null,
-    width: 1800,
-    height: 1800,
-    areaWidth: 1800,
-    areaHeight: 1800,
-    position: { top: 0, left: 0, width: 1800, height: 1800 },
+    width: 1200,  // 4 inches @ 300 DPI
+    height: 1050, // 3.5 inches @ 300 DPI
+    areaWidth: 1200,
+    areaHeight: 1050,
+    position: { top: 0, left: 0, width: 1200, height: 1050 },
   },
   {
     placement: 'sleeve_right',
     label: 'Manga derecha',
+    description: 'Área de manga derecha (4" × 3.5" / 10.2 × 8.9 cm)',
     printfileId: null,
-    width: 1800,
-    height: 1800,
-    areaWidth: 1800,
-    areaHeight: 1800,
-    position: { top: 0, left: 0, width: 1800, height: 1800 },
+    width: 1200,
+    height: 1050,
+    areaWidth: 1200,
+    areaHeight: 1050,
+    position: { top: 0, left: 0, width: 1200, height: 1050 },
   },
 ]
 
@@ -82,8 +88,32 @@ function resolveProductId(identifier: string): number | null {
   return null
 }
 
-function buildPlacements(files: any[] | undefined, printfilesData?: any): PlacementEntry[] {
+async function buildPlacementsAsync(files: any[] | undefined, printfilesData?: any, productId?: number): Promise<PlacementEntry[]> {
   const resultMap = new Map<string, PlacementEntry>()
+  
+  // PRIORIDAD 1: Intentar cargar desde archivo de printfiles actualizado
+  if (productId) {
+    const { getOptimizedPlacementsWithPrintfiles } = await import('@/lib/printful-dimensions')
+    const printfilePlacements = await getOptimizedPlacementsWithPrintfiles(productId)
+    if (printfilePlacements) {
+      console.log(`[buildPlacements] Using printfiles data for product ${productId}`)
+      printfilePlacements.forEach(placement => {
+        resultMap.set(placement.placement, {
+          placement: placement.placement,
+          label: placement.label,
+          description: placement.description,
+          printfileId: null,
+          width: placement.width,
+          height: placement.height,
+          areaWidth: placement.areaWidth,
+          areaHeight: placement.areaHeight,
+          position: placement.position,
+        })
+      })
+      // Si ya tenemos datos de printfiles, retornar directamente
+      return Array.from(resultMap.values())
+    }
+  }
   
   // PASO 1: Normalizar placement codes
   const PLACEMENT_CODES: Record<string, string> = {
@@ -325,7 +355,7 @@ export async function GET(request: NextRequest, context: { params: { productId: 
       : Array.isArray(product?.files)
         ? product.files
         : undefined
-    const placements = buildPlacements(filesSource, printfilesData)
+    const placements = await buildPlacementsAsync(filesSource, printfilesData, productId)
 
     const name =
       product.title ||

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { Modal, ModalFooter } from './ui/Modal'
+import { calculateOptimalDimensions, ensureSquareQR, validatePosition } from '@/lib/printful-dimensions'
 
 // ========================================
 // MOCKUP CACHE UTILITIES
@@ -229,46 +230,51 @@ type DesignMetadata = Record<string, { width: number; height: number }>
 const POLL_INTERVAL_MS = 2000
 const MAX_POLL_ATTEMPTS = 20
 
+// Dimensiones genéricas optimizadas como fallback
 const FALLBACK_PLACEMENTS: ProductPlacement[] = [
   {
     placement: 'front',
     label: 'Frente',
+    description: 'Área frontal estándar (12" × 16" / 30.5 × 40.6 cm)',
     printfileId: null,
     position: { top: 0, left: 0, width: 3600, height: 4800 },
-    width: 3600,
-    height: 4800,
+    width: 3600,  // 12 inches @ 300 DPI
+    height: 4800, // 16 inches @ 300 DPI
     areaWidth: 3600,
     areaHeight: 4800,
   },
   {
     placement: 'back',
     label: 'Espalda',
+    description: 'Área trasera completa (12" × 16" / 30.5 × 40.6 cm)',
     printfileId: null,
-    position: { top: 0, left: 0, width: 3600, height: 4800 },
+    position: { top: 800, left: 0, width: 3600, height: 4000 }, // Ajustado hacia abajo
     width: 3600,
-    height: 4800,
+    height: 4000, // Reducido para mejor centrado
     areaWidth: 3600,
     areaHeight: 4800,
   },
   {
     placement: 'sleeve_right',
     label: 'Manga derecha',
+    description: 'Área de manga derecha (2.5" × 4.5" / 6.4 × 11.4 cm)',
     printfileId: null,
-    position: { top: 0, left: 0, width: 1800, height: 1800 },
-    width: 1800,
-    height: 1800,
-    areaWidth: 1800,
-    areaHeight: 1800,
+    position: { top: 0, left: 0, width: 750, height: 1350 },
+    width: 750,  // 2.5 inches @ 300 DPI
+    height: 1350, // 4.5 inches @ 300 DPI
+    areaWidth: 750,
+    areaHeight: 1350,
   },
   {
     placement: 'sleeve_left',
     label: 'Manga izquierda',
+    description: 'Área de manga izquierda (2.5" × 4.5" / 6.4 × 11.4 cm)',
     printfileId: null,
-    position: { top: 0, left: 0, width: 1800, height: 1800 },
-    width: 1800,
-    height: 1800,
-    areaWidth: 1800,
-    areaHeight: 1800,
+    position: { top: 0, left: 0, width: 750, height: 1350 },
+    width: 750,
+    height: 1350,
+    areaWidth: 750,
+    areaHeight: 1350,
   },
 ]
 

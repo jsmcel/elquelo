@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { ensureUserProfile, generateQrCodeValue, buildDefaultDestination, generateUniqueDestinationUrl } from '@/lib/user-profile'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { getAllPackages, getPackageConfig } from '@/lib/packages'
 
 
 type MemberPayload = {
@@ -164,85 +165,98 @@ export async function POST(req: NextRequest) {
       // Create products for selected packages
       console.log('🔍 Selected packages:', selectedPackages)
       console.log('🔍 Data length:', data?.length)
-      console.log('🔍 Includes camisetas:', selectedPackages.includes('camisetas'))
       
-      if (selectedPackages.includes('camisetas') && data && data.length > 0) {
-        console.log('✅ Creating camisetas for', data.length, 'participants')
+      if (selectedPackages.length > 0 && data && data.length > 0) {
+        console.log('✅ Creating products for', selectedPackages.length, 'packages and', data.length, 'participants')
         
-        // Get real price from Printful API
-        let realPrice = 0 // Se carga de la API
-        try {
-          const priceResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/variants/price`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ variantIds: [4013] })
+        // Get all variant IDs from selected packages
+        const allVariantIds: number[] = []
+        const packagesToProcess = getAllPackages().filter(pkg => selectedPackages.includes(pkg.id))
+        
+        packagesToProcess.forEach(pkg => {
+          pkg.products.forEach(product => {
+            if (product.defaultVariantId && product.defaultVariantId !== 0) {
+              allVariantIds.push(product.defaultVariantId)
+            }
+          })
+        })
+        
+        // Get real prices from Printful API
+        const variantPrices: Record<number, number> = {}
+        
+        if (allVariantIds.length > 0) {
+          try {
+            const priceResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/variants/price`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ variantIds: allVariantIds })
+            })
+            
+            if (priceResponse.ok) {
+              const { prices } = await priceResponse.json()
+              Object.assign(variantPrices, prices)
+              console.log('✅ Real prices fetched:', variantPrices)
+            }
+          } catch (error) {
+            console.error('❌ Error fetching real prices:', error)
+          }
+        }
+        
+        // Create design entries for each QR and selected packages
+        const designData = data.map((qr: any) => {
+          const allProducts: any[] = []
+          
+          // Get participant info to determine if they are novio/novia
+          const participant = members.find((m: any) => m.name === qr.title || m.name === qr.description)
+          const isNovioNovia = participant?.is_novio_novia || false
+          
+          // Add products from each selected package
+          packagesToProcess.forEach(pkg => {
+            // Skip novio/novia only packages if participant is not novio/novia
+            if (pkg.onlyForNoviNovia && !isNovioNovia) {
+              console.log(`⏭️ Skipping package ${pkg.id} for non-novio/novia participant`)
+              return
+            }
+            
+            pkg.products.forEach(product => {
+              const variantId = product.defaultVariantId || 0
+              const realPrice = variantPrices[variantId] || product.estimatedPrice || 0
+              
+              allProducts.push({
+                id: crypto.randomUUID(),
+                productId: product.productId,
+                templateId: product.productId,
+                variantId: variantId,
+                productName: product.name,
+                size: product.defaultSize || 'M',
+                color: product.defaultColor || 'White',
+                colorCode: product.defaultColorCode || '#FFFFFF',
+                designsByPlacement: {},
+                designMetadata: {},
+                variantMockups: {},
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              })
+            })
           })
           
-          if (priceResponse.ok) {
-            const { prices } = await priceResponse.json()
-            if (prices[4013]) {
-              realPrice = prices[4013].finalPrice
-              console.log('✅ Real price for variant 4013:', realPrice)
-            }
+          return {
+            qr_code: qr.code,
+            design_data: {
+              type: 'default',
+              text: qr.title || 'Mi QR',
+              color: '#000000',
+              font: 'Arial',
+              size: 24,
+              position: { x: 50, y: 50 },
+              products: allProducts
+            },
+            product_size: 'M',
+            product_color: 'White',
+            product_gender: 'unisex',
+            created_at: new Date().toISOString(),
           }
-        } catch (error) {
-          console.error('❌ Error fetching real price:', error)
-        }
-        
-        // Si no se pudo obtener el precio real, usar un precio por defecto
-        if (realPrice === 0) {
-          console.warn('⚠️ No se pudo obtener el precio real, usando precio por defecto')
-          realPrice = 15.00 // Precio por defecto temporal
-        }
-        
-        const productsData = data.map((qr: any) => ({
-          qr_id: qr.id,
-          user_id: user.id,
-          variant_id: 4013, // M White T-shirt por defecto
-          product_id: 71, // T-shirt product
-          size: 'M', // Default size, can be customized later
-          color: 'White',
-          color_code: '#FFFFFF',
-          quantity: 1,
-          price: realPrice, // Real price from API
-          created_at: new Date().toISOString(),
-        }))
-
-        console.log('📦 Creating design entries for:', productsData.length, 'products')
-        
-        // Create design entries in qr_designs table instead of qr_products
-        const designData = data.map((qr: any) => ({
-          qr_code: qr.code,
-          design_data: {
-            type: 'default',
-            text: qr.title || 'Mi QR',
-            color: '#000000',
-            font: 'Arial',
-            size: 24,
-            position: { x: 50, y: 50 },
-            variant_id: 4013,
-            product_id: 71,
-            products: [{
-              id: crypto.randomUUID(),
-              productId: 71,
-              templateId: 71,
-              variantId: 4013,
-              productName: 'Unisex Staple T-Shirt',
-              size: 'M',
-              color: 'White',
-              colorCode: '#FFFFFF',
-              designsByPlacement: {},
-              designMetadata: {},
-              variantMockups: {},
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }]
-          },
-          product_size: 'M',
-          product_color: 'White',
-          product_gender: 'unisex',
-          created_at: new Date().toISOString(),
-        }))
+        })
 
         const { error: productsError } = await supabase
           .from('qr_designs')
