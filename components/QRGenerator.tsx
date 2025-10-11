@@ -1520,7 +1520,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             productId: 71, // Default product
             templateId: 71,
             variantId: 0,
-            productName: 'Nuevo Producto',
+            productName: 'Producto',
             size: null,
             color: null,
             colorCode: null,

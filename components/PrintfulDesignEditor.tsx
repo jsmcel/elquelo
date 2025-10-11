@@ -1110,11 +1110,9 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     const variantId = savedDesignData?.printfulProduct?.variantId || savedDesignData?.printful?.variantId
     
     // Es un producto nuevo si:
-    // - No hay variantId o es 0
-    // - El nombre es genérico ('Producto')
+    // - No hay variantId o es 0 (indica producto no configurado)
     // - O no hay designsByPlacement (producto sin diseño)
     const isNewProduct = !variantId || variantId === 0 || 
-                        productName === 'Producto' || 
                         !savedDesignData?.designsByPlacement ||
                         Object.keys(savedDesignData?.designsByPlacement || {}).length === 0
     
@@ -1857,45 +1855,49 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
         
         // RE-GUARDAR el diseño con los mockups actualizados
         console.log('🔄 Re-guardando diseño con mockups actualizados...')
-        const updatedPayload = {
-          editorType: 'printful',
-          qrCode,
-          savedAt: new Date().toISOString(),
-          designsByPlacement,
-          designMetadata,
-          variantMockups: { ...variantMockups, [variantId]: placementsForVariant },
-          selectedVariantId,
-          productId: productData.productId,
-          slug: String(selectedProductId),
-          productName: productData.name,
-          printfulProduct: {
-            productId: productData.productId,
-            templateId: productData.templateId,
-            name: productData.name,
-            variantId: selectedVariantId,
-          },
-          printful: {
-            productId: productData.productId,
-            templateId: productData.templateId,
-            productName: productData.name,
-            source: productData.source,
-            variantId: selectedVariantId,
-            size: selectedVariant?.size || selectedSize || null,
-            color: selectedVariant?.colorName || null,
-            colorCode: selectedVariant?.colorCode || selectedColorCode || null,
-            placements: Object.fromEntries(
-              Object.entries(designsByPlacement).map(([placement, url]) => [placement, { imageUrl: url || null }])
-            ),
-            designMetadata,
-            variantMockups: { ...variantMockups, [variantId]: placementsForVariant },
-            activePlacement,
-            lastMessage: statusMessage,
-          },
-        }
         
-        // Llamar a onSave con los mockups actualizados
-        onSave(updatedPayload)
-        console.log('✅ Diseño re-guardado con mockups')
+        // Usar un timeout para asegurar que el estado se haya actualizado
+        setTimeout(() => {
+          const updatedPayload = {
+            editorType: 'printful',
+            qrCode,
+            savedAt: new Date().toISOString(),
+            designsByPlacement,
+            designMetadata,
+            variantMockups, // Usar el estado actualizado
+            selectedVariantId,
+            productId: productData?.productId || 71,
+            slug: String(selectedProductId),
+            productName: productData?.name || 'Producto',
+            printfulProduct: {
+              productId: productData?.productId || 71,
+              templateId: productData?.templateId || 71,
+              name: productData?.name || 'Producto',
+              variantId: selectedVariantId,
+            },
+            printful: {
+              productId: productData?.productId || 71,
+              templateId: productData?.templateId || 71,
+              productName: productData?.name || 'Producto',
+              source: productData?.source || 'printful',
+              variantId: selectedVariantId,
+              size: selectedVariant?.size || selectedSize || null,
+              color: selectedVariant?.colorName || null,
+              colorCode: selectedVariant?.colorCode || selectedColorCode || null,
+              placements: Object.fromEntries(
+                Object.entries(designsByPlacement).map(([placement, url]) => [placement, { imageUrl: url || null }])
+              ),
+              designMetadata,
+              variantMockups, // Usar el estado actualizado
+              activePlacement,
+              lastMessage: statusMessage,
+            },
+          }
+          
+          // Llamar a onSave con los mockups actualizados
+          onSave(updatedPayload)
+          console.log('✅ Diseño re-guardado con mockups')
+        }, 100)
         return
       }
 
