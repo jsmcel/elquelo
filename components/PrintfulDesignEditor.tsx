@@ -922,7 +922,7 @@ function CatalogSelector({ selectedId, onSelect, fallbackItem = null, className,
       setConfirmedSelection(tentativeSelection)
       setTentativeSelection(null)
       
-      // Notificar al componente padre
+      // Notificar al componente padre para abrir la pantalla completa de edición
       if (onConfirmProduct) {
         onConfirmProduct(tentativeSelection)
       }
@@ -2241,14 +2241,18 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
               className="w-full"
               autoCollapseOnSelect={false}
               confirmedProductId={confirmedProductId}
-              onConfirmProduct={setConfirmedProductId}
+              onConfirmProduct={(productId) => {
+                // Al confirmar el producto, automáticamente abrir la pantalla completa de edición
+                setConfirmedProductId(productId)
+                setSelectedProductId(productId)
+              }}
             />
           </div>
         )}
 
         {/* ÁREAS DE IMPRESIÓN - Solo cuando hay producto confirmado */}
         {confirmedProductId && selectedItem && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="text-center">
               <h2 className="text-xl font-bold text-gray-900 mb-2">Selecciona d�nde colocar tu dise�o</h2>
               <p className="text-sm text-gray-600">Haz clic en el �rea donde quieres colocar tu imagen o QR</p>
