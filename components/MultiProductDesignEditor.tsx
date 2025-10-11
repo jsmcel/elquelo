@@ -103,15 +103,27 @@ export function MultiProductDesignEditor({
       color: designData?.printful?.color || designData?.printfulProduct?.color || editingProduct?.color || null,
       colorCode: designData?.printful?.colorCode || designData?.printfulProduct?.colorCode || editingProduct?.colorCode || null,
       // CRÍTICO: Priorizar designData sobre editingProduct para preservar imágenes nuevas
-      designsByPlacement: {
-        ...(editingProduct?.designsByPlacement || {}),
-        ...(designData?.designsByPlacement || {}),
-        ...(designData?.printful?.placements ? 
-          Object.fromEntries(
-            Object.entries(designData.printful.placements).map(([k, v]: [string, any]) => [k, v?.imageUrl || v])
-          ) : {}
-        ),
-      },
+      // NORMALIZAR: Convertir todos los valores a strings o null (nunca objetos)
+      designsByPlacement: (() => {
+        const merged = {
+          ...(editingProduct?.designsByPlacement || {}),
+          ...(designData?.designsByPlacement || {}),
+          ...(designData?.printful?.placements ? 
+            Object.fromEntries(
+              Object.entries(designData.printful.placements).map(([k, v]: [string, any]) => [k, v?.imageUrl || v])
+            ) : {}
+          ),
+        }
+        
+        // NORMALIZAR: Asegurar que todos los valores son strings o null
+        return Object.fromEntries(
+          Object.entries(merged).map(([key, value]: [string, any]) => {
+            if (typeof value === 'string') return [key, value]
+            if (value && typeof value === 'object' && 'imageUrl' in value) return [key, value.imageUrl || null]
+            return [key, value || null]
+          })
+        )
+      })(),
       designMetadata: {
         ...(editingProduct?.designMetadata || {}),
         ...(designData?.designMetadata || {}),
@@ -339,12 +351,12 @@ export function MultiProductDesignEditor({
               </div>
             )}
           </div>
-      </div>
+        </div>
 
       {/* Footer con botón sticky */}
       <ModalFooter className="sticky bottom-0 bg-white border-t border-gray-200">
-        <button
-          onClick={handleSaveAll}
+            <button
+              onClick={handleSaveAll}
           disabled={products.length === 0 || saving}
           className="w-full min-h-[44px] px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 touch-manipulation"
         >
