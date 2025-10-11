@@ -27,15 +27,15 @@ interface MockupCacheEntry {
 type MockupCache = Record<string, MockupCacheEntry>
 
 /**
- * Calcula un hash simple del diseÒo basado en las im·genes por placement
+ * Calcula un hash simple del diseÔøΩo basado en las imÔøΩgenes por placement
  */
 function hashDesign(designsByPlacement: Record<string, string>): string {
   const sorted = Object.keys(designsByPlacement)
     .sort()
-    .filter(key => designsByPlacement[key]) // Solo incluir placements con diseÒo
+    .filter(key => designsByPlacement[key]) // Solo incluir placements con diseÔøΩo
   const serialized = sorted.map(key => `${key}:${designsByPlacement[key]}`).join('|')
   
-  // Simple base64 hash (para algo m·s robusto, usar crypto.subtle.digest)
+  // Simple base64 hash (para algo mÔøΩs robusto, usar crypto.subtle.digest)
   try {
     return btoa(serialized)
   } catch {
@@ -45,7 +45,7 @@ function hashDesign(designsByPlacement: Record<string, string>): string {
 }
 
 /**
- * Obtiene un mockup desde la cachÈ de localStorage
+ * Obtiene un mockup desde la cachÔøΩ de localStorage
  */
 function getCachedMockup(variantId: number, designHash: string): Record<string, string> | null {
   if (typeof window === 'undefined') return null
@@ -77,7 +77,7 @@ function getCachedMockup(variantId: number, designHash: string): Record<string, 
 }
 
 /**
- * Guarda un mockup en la cachÈ de localStorage
+ * Guarda un mockup en la cachÔøΩ de localStorage
  */
 function saveMockupToCache(
   variantId: number,
@@ -98,7 +98,7 @@ function saveMockupToCache(
       timestamp: Date.now(),
     }
     
-    // Limpiar entradas antiguas si excedemos el lÌmite
+    // Limpiar entradas antiguas si excedemos el lÔøΩmite
     const entries = Object.entries(cache)
     if (entries.length > MAX_CACHE_ENTRIES) {
       const sorted = entries.sort((a, b) => b[1].timestamp - a[1].timestamp)
@@ -231,12 +231,12 @@ type DesignMetadata = Record<string, { width: number; height: number }>
 const POLL_INTERVAL_MS = 2000
 const MAX_POLL_ATTEMPTS = 20
 
-// Dimensiones genÈricas optimizadas como fallback
+// Dimensiones genÔøΩricas optimizadas como fallback
 const FALLBACK_PLACEMENTS: ProductPlacement[] = [
   {
     placement: 'front',
     label: 'Frente',
-    description: '¡rea frontal est·ndar (12" ◊ 16" / 30.5 ◊ 40.6 cm)',
+    description: 'ÔøΩrea frontal estÔøΩndar (12" ÔøΩ 16" / 30.5 ÔøΩ 40.6 cm)',
     printfileId: null,
     position: { top: 0, left: 0, width: 3600, height: 4800 },
     width: 3600,  // 12 inches @ 300 DPI
@@ -247,7 +247,7 @@ const FALLBACK_PLACEMENTS: ProductPlacement[] = [
   {
     placement: 'back',
     label: 'Espalda',
-    description: '¡rea trasera completa (12" ◊ 16" / 30.5 ◊ 40.6 cm)',
+    description: 'ÔøΩrea trasera completa (12" ÔøΩ 16" / 30.5 ÔøΩ 40.6 cm)',
     printfileId: null,
     position: { top: 800, left: 0, width: 3600, height: 4000 }, // Ajustado hacia abajo
     width: 3600,
@@ -258,7 +258,7 @@ const FALLBACK_PLACEMENTS: ProductPlacement[] = [
   {
     placement: 'sleeve_right',
     label: 'Manga derecha',
-    description: '¡rea de manga derecha (2.5" ◊ 4.5" / 6.4 ◊ 11.4 cm)',
+    description: 'ÔøΩrea de manga derecha (2.5" ÔøΩ 4.5" / 6.4 ÔøΩ 11.4 cm)',
     printfileId: null,
     position: { top: 0, left: 0, width: 750, height: 1350 },
     width: 750,  // 2.5 inches @ 300 DPI
@@ -269,7 +269,7 @@ const FALLBACK_PLACEMENTS: ProductPlacement[] = [
   {
     placement: 'sleeve_left',
     label: 'Manga izquierda',
-    description: '¡rea de manga izquierda (2.5" ◊ 4.5" / 6.4 ◊ 11.4 cm)',
+    description: 'ÔøΩrea de manga izquierda (2.5" ÔøΩ 4.5" / 6.4 ÔøΩ 11.4 cm)',
     printfileId: null,
     position: { top: 0, left: 0, width: 750, height: 1350 },
     width: 750,
@@ -1428,7 +1428,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       nextColorCode = productData.variants[0].colorCode
     }
     
-    // ⁄ltimo fallback
+    // ÔøΩltimo fallback
     if (!nextSize) {
       nextSize = productData.sizes[0] ?? ''
     }
@@ -1819,7 +1819,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           })
           next[variantId] = placementsForVariant
           
-          // GUARDAR EN CACH… el mockup reciÈn generado
+          // GUARDAR EN CACHÔøΩ el mockup reciÔøΩn generado
           const currentHash = hashDesign(designsByPlacement)
           const mockupsForCache: Record<string, string> = {}
           Object.entries(placementsForVariant).forEach(([placement, data]) => {
@@ -1859,9 +1859,9 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
   const handleSave = () => {
     if (!productData) return
     
-    // NUEVA VALIDACI”N: QR obligatorio
+    // NUEVA VALIDACIÔøΩN: QR obligatorio
     if (!qrPlaced) {
-      toast.error('?? Debes colocar el QR en al menos una ·rea del producto')
+      toast.error('?? Debes colocar el QR en al menos una ÔøΩrea del producto')
       return
     }
     
@@ -1913,7 +1913,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     console.log('?? [PrintfulDesignEditor] Llamando onSave con payload')
     onSave(payload)
     console.log('?? [PrintfulDesignEditor] onSave llamado exitosamente')
-    toast.success('DiseÒo guardado')
+    toast.success('DiseÔøΩo guardado')
   }
 
   return (
@@ -1926,7 +1926,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
         }
         onClose()
       }}
-      title={productData?.name || 'DiseÒador de Producto'}
+      title={productData?.name || 'DiseÔøΩador de Producto'}
       description={`QR: ${qrCode}`}
       size="7xl"
       fullHeight={true}
@@ -1955,17 +1955,14 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           </div>
         </div>
 
-        {/* ¡REAS DE IMPRESI”N - LO M¡S PROMINENTE */}
+        {/* ÔøΩREAS DE IMPRESIÔøΩN - LO MÔøΩS PROMINENTE */}
         {selectedItem && (
           <div className="space-y-4">
             <div className="text-center">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Selecciona dÛnde colocar tu diseÒo</h2>
-              <p className="text-sm text-gray-600">Haz clic en el ·rea donde quieres colocar tu imagen o QR</p>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Selecciona dÔøΩnde colocar tu diseÔøΩo</h2>
+              <p className="text-sm text-gray-600">Haz clic en el ÔøΩrea donde quieres colocar tu imagen o QR</p>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  √Åreas de impresi√≥n disponibles ({placementList.length}):
-                </div>
-                <div className="grid grid-cols-2 gap-2">
               {placementList.map((placement) => {
                 const isActive = activePlacement === placement.placement
                 const hasMockup = Boolean(currentVariantMockups[placement.placement])
@@ -2006,7 +2003,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           </div>
         )}
 
-          {confirmedItem && (
+        {confirmedItem && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-4">
               <label className="block text-xs font-semibold text-gray-500">Talla</label>
@@ -2069,7 +2066,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                     </button>
                   </div>
                   <p className="text-xs text-gray-500">
-                    El mockup se generar· autom·ticamente al guardar el diseÒo.
+                    El mockup se generarÔøΩ automÔøΩticamente al guardar el diseÔøΩo.
                   </p>
                 </div>
               ) : (
@@ -2124,7 +2121,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
             <div className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
               <p>
-                DiseÒos cargados:{' '}
+                DiseÔøΩos cargados:{' '}
                 <span className="font-semibold text-gray-900">{Object.values(designsByPlacement).filter(Boolean).length}</span>{' '}/ {placementList.length}
               </p>
               <p>
@@ -2150,7 +2147,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
             disabled={!qrPlaced || generatingMockup || uploading}
             className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
           >
-            {!qrPlaced ? '?? Coloca el QR primero' : 'Guardar diseÒo y generar mockup'}
+            {!qrPlaced ? '?? Coloca el QR primero' : 'Guardar diseÔøΩo y generar mockup'}
           </button>
         </div>
       </ModalFooter>
