@@ -195,6 +195,60 @@ function buildDesignStateEntry(designData: any, url?: string) {
 
 const FALLBACK_DESTINATION = 'https://elquelo.com/despedida'
 
+// Función para normalizar designData y evitar crashes
+function normalizeDesignData(designData: any): any {
+  if (!designData || typeof designData !== 'object') {
+    return designData
+  }
+
+  const normalized = { ...designData }
+
+  // Normalizar products array si existe
+  if (normalized.products && Array.isArray(normalized.products)) {
+    normalized.products = normalized.products.map((product: any) => {
+      if (!product || typeof product !== 'object') {
+        return product
+      }
+
+      const normalizedProduct = { ...product }
+
+      // Normalizar designsByPlacement
+      if (normalizedProduct.designsByPlacement) {
+        normalizedProduct.designsByPlacement = Object.fromEntries(
+          Object.entries(normalizedProduct.designsByPlacement).map(([key, value]: [string, any]) => {
+            if (typeof value === 'string') {
+              return [key, value]
+            }
+            if (value && typeof value === 'object' && 'imageUrl' in value) {
+              return [key, value.imageUrl || null]
+            }
+            return [key, null]
+          })
+        )
+      }
+
+      return normalizedProduct
+    })
+  }
+
+  // Normalizar también el formato legacy si existe
+  if (normalized.designsByPlacement) {
+    normalized.designsByPlacement = Object.fromEntries(
+      Object.entries(normalized.designsByPlacement).map(([key, value]: [string, any]) => {
+        if (typeof value === 'string') {
+          return [key, value]
+        }
+        if (value && typeof value === 'object' && 'imageUrl' in value) {
+          return [key, value.imageUrl || null]
+        }
+        return [key, null]
+      })
+    )
+  }
+
+  return normalized
+}
+
 interface QRGeneratorProps {
   onDesignChanged?: () => void
 }
@@ -368,7 +422,11 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             const response = await fetch(`/api/design/${qr.code}`)
             if (response.ok) {
               const data = await response.json()
-              const entry = buildDesignStateEntry(data.designData, data.url)
+              
+              // CRÍTICO: Normalizar designData antes de usar
+              const normalizedDesignData = data.designData ? normalizeDesignData(data.designData) : data.designData
+              
+              const entry = buildDesignStateEntry(normalizedDesignData, data.url)
               map[qr.code] = {
                 loading: false,
                 url: entry.url,
@@ -377,8 +435,8 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                 variantId: entry.variantId,
                 source: entry.source,
                 printfulSummary: entry.printfulSummary,
-                designData: data.designData,
-                hasDesign: data.hasDesign ?? Boolean(data.designData),
+                designData: normalizedDesignData,
+                hasDesign: data.hasDesign ?? Boolean(normalizedDesignData),
               }
             } else {
               map[qr.code] = { loading: false }
