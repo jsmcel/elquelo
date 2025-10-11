@@ -46,3 +46,6 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #2563eb;
 }
+
+/* Import modal styles */
+@import '../styles/modal.css';

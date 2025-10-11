@@ -1,8 +1,8 @@
 'use client'
 
-import { X, PlusCircle, Edit2, Trash2 } from 'lucide-react'
+import { PlusCircle, Edit2, Trash2 } from 'lucide-react'
 import { migrateLegacyDesign } from '@/types/qr-product'
-import { QRProductsList } from './QRProductsList'
+import { Modal, ModalFooter } from './ui/Modal'
 import { useState } from 'react'
 import { toast } from 'react-hot-toast'
 
@@ -70,99 +70,85 @@ export function ViewMultiProductDesignModal({ qrCode, designData, onClose, onEdi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">
-              Diseños - QR {qrCode}
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {products.length} producto{products.length !== 1 ? 's' : ''} configurado{products.length !== 1 ? 's' : ''}
-            </p>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={`Diseños - QR ${qrCode}`}
+      description={`${products.length} producto${products.length !== 1 ? 's' : ''} configurado${products.length !== 1 ? 's' : ''}`}
+      size="6xl"
+    >
+      <div className="space-y-4 sm:space-y-6">
+        {products.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>No hay productos configurados</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-auto flex-1">
-          {products.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p>No hay productos configurados</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {products.map((product, index) => (
-                <div
-                  key={product.id}
-                  className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50"
-                >
-                  {/* Product Header */}
-                  <div className="bg-white p-4 border-b border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-gray-900">
-                          {product.productName}
-                        </h4>
-                        <div className="flex items-center gap-3 mt-1">
-                          {product.size && (
-                            <span className="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                              {product.size}
-                            </span>
-                          )}
-                          {product.color && (
-                            <span className="flex items-center gap-1.5 text-sm text-gray-600">
-                              {product.colorCode && (
-                                <span
-                                  className="w-4 h-4 rounded-full border border-gray-300"
-                                  style={{ backgroundColor: product.colorCode }}
-                                />
-                              )}
-                              {product.color}
-                            </span>
-                          )}
-                          <span className="text-xs text-gray-500">
-                            Variant ID: {product.variantId}
+        ) : (
+          <div className="space-y-4 sm:space-y-6">
+            {products.map((product, index) => (
+              <div
+                key={product.id}
+                className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50"
+              >
+                {/* Product Header */}
+                <div className="bg-white p-4 border-b border-gray-200">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                        {product.productName}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
+                        {product.size && (
+                          <span className="text-xs sm:text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                            {product.size}
                           </span>
-                        </div>
-                      </div>
-                      
-                      {/* Botones de acción */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleEditDesigns}
-                          className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                          title="Editar este producto"
-                        >
-                          <Edit2 className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingProductId(product.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Eliminar producto"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+                        )}
+                        {product.color && (
+                          <span className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-600">
+                            {product.colorCode && (
+                              <span
+                                className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"
+                                style={{ backgroundColor: product.colorCode }}
+                              />
+                            )}
+                            {product.color}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          Variant ID: {product.variantId}
+                        </span>
                       </div>
                     </div>
+                    
+                    {/* Botones de acción */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={handleEditDesigns}
+                        className="flex-1 sm:flex-initial min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors touch-manipulation"
+                        title="Editar este producto"
+                      >
+                        <Edit2 className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingProductId(product.id)}
+                        className="flex-1 sm:flex-initial min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
+                        title="Eliminar producto"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Product Content */}
-                  <div className="p-4">
-                    {/* Mockups */}
-                    {product.variantMockups && Object.keys(product.variantMockups).length > 0 ? (
-                      <div>
-                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Mockups Generados</h5>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Product Content */}
+                <div className="p-4">
+                  {/* Mockups */}
+                  {product.variantMockups && Object.keys(product.variantMockups).length > 0 ? (
+                    <div>
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3">Mockups Generados</h5>
+                      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                           {Object.entries(product.variantMockups).map(([variantId, placements]: [string, any]) =>
                             Object.entries(placements || {}).map(([placement, mockup]: [string, any]) => (
                               <div
@@ -182,11 +168,11 @@ export function ViewMultiProductDesignModal({ qrCode, designData, onClose, onEdi
                           )}
                         </div>
                       </div>
-                    ) : (
-                      /* Designs by Placement */
-                      <div>
-                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Diseños por Área</h5>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  ) : (
+                    /* Designs by Placement */
+                    <div>
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3">Diseños por Área</h5>
+                      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                           {Object.entries(product.designsByPlacement || {})
                             .filter(([_, url]) => url && url.trim() !== '')
                             .map(([placement, url]) => (
@@ -211,72 +197,69 @@ export function ViewMultiProductDesignModal({ qrCode, designData, onClose, onEdi
                       </div>
                     )}
 
-                    {/* Metadata */}
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
-                        <div>
-                          <span className="font-semibold">Creado:</span>{' '}
-                          {new Date(product.createdAt).toLocaleString('es-ES')}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Actualizado:</span>{' '}
-                          {new Date(product.updatedAt).toLocaleString('es-ES')}
-                        </div>
+                  {/* Metadata */}
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs text-gray-600">
+                      <div>
+                        <span className="font-semibold">Creado:</span>{' '}
+                        {new Date(product.createdAt).toLocaleString('es-ES')}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Actualizado:</span>{' '}
+                        {new Date(product.updatedAt).toLocaleString('es-ES')}
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50 flex gap-3">
+        {/* Footer Buttons */}
+        <ModalFooter className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+            className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors touch-manipulation"
           >
             Cerrar
           </button>
           {onEdit && (
             <button
               onClick={handleEditDesigns}
-              className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full sm:flex-1 min-h-[44px] px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 touch-manipulation"
             >
               <PlusCircle className="h-4 w-4" />
               Añadir Producto
             </button>
           )}
-        </div>
-
-        {/* Modal de confirmación de eliminación */}
-        {deletingProductId && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-            <div className="rounded-lg bg-white p-6 shadow-xl max-w-md mx-4">
-              <h3 className="mb-3 text-lg font-bold text-gray-900">Confirmar eliminación</h3>
-              <p className="mb-4 text-sm text-gray-600">
-                ¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setDeletingProductId(null)}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => handleDeleteProduct(deletingProductId)}
-                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        </ModalFooter>
       </div>
-    </div>
+
+      {/* Modal de confirmación de eliminación */}
+      <Modal
+        isOpen={!!deletingProductId}
+        onClose={() => setDeletingProductId(null)}
+        title="Confirmar eliminación"
+        description="¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer."
+        size="md"
+      >
+        <ModalFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+          <button
+            onClick={() => setDeletingProductId(null)}
+            className="w-full sm:w-auto min-h-[44px] rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 touch-manipulation"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => deletingProductId && handleDeleteProduct(deletingProductId)}
+            className="w-full sm:w-auto min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 touch-manipulation"
+          >
+            Eliminar
+          </button>
+        </ModalFooter>
+      </Modal>
+    </Modal>
   )
 }
 
