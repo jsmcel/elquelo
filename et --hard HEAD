@@ -1,0 +1,25 @@
+[1mdiff --git a/components/PrintfulDesignEditor.tsx b/components/PrintfulDesignEditor.tsx[m
+[1mindex 0086b23..fa6083a 100644[m
+[1m--- a/components/PrintfulDesignEditor.tsx[m
+[1m+++ b/components/PrintfulDesignEditor.tsx[m
+[36m@@ -1963,8 +1963,6 @@[m [mexport function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved[m
+               <p className="text-sm text-gray-600">Haz clic en el área donde quieres colocar tu imagen o QR</p>[m
+             </div>[m
+             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">[m
+[31m-[m
+[31m-            {selectedItem && ([m
+               <div className="space-y-2">[m
+                 <div className="text-xs text-gray-600">[m
+                   Ãreas de impresiÃ³n disponibles ({placementList.length}):[m
+[36m@@ -2007,10 +2005,8 @@[m [mexport function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved[m
+                 )[m
+               })}[m
+             </div>[m
+[31m-              </div>[m
+[31m-            )}[m
+[31m-[m
+           </div>[m
+[32m+[m[32m        )}[m
+ [m
+           {confirmedItem && ([m
+           <div className="space-y-4">[m

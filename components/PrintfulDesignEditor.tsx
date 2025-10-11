@@ -1104,7 +1104,13 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     }
     return DEFAULT_PRODUCT_ID
   })
-  const [confirmedProductId, setConfirmedProductId] = useState<number | null>(null)
+  const [confirmedProductId, setConfirmedProductId] = useState<number | null>(() => {
+    const candidate = Number(savedDesignData?.printfulProduct?.productId || savedDesignData?.productId)
+    if (Number.isFinite(candidate) && candidate > 0) {
+      return candidate
+    }
+    return null // Si no hay producto válido, mostrar catálogo
+  })
   const [loadingProduct, setLoadingProduct] = useState(true)
   const [productData, setProductData] = useState<ProductData | null>(null)
   const [designsByPlacement, setDesignsByPlacement] = useState<DesignsByPlacement>({})
@@ -1912,8 +1918,79 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     console.log('?? [PrintfulDesignEditor] Payload completo:', JSON.stringify(payload, null, 2))
     console.log('?? [PrintfulDesignEditor] Llamando onSave con payload')
     onSave(payload)
-    console.log('?? [PrintfulDesignEditor] onSave llamado exitosamente')
-    toast.success('Dise�o guardado')
+    console.log('💾 [PrintfulDesignEditor] onSave llamado exitosamente')
+    toast.success('Diseño guardado')
+    
+    // GENERAR MOCKUP AUTOMÁTICAMENTE
+    handleGenerateMockup()
+  }
+  
+  const handleGenerateMockup = async () => {
+    if (!productData || !selectedVariantId) {
+      toast.error('Selecciona una talla y color para generar el mockup')
+      return
+    }
+    
+    // Verificar si ya existe en caché
+    const designHash = hashDesign(designsByPlacement)
+    const cachedMockup = getCachedMockup(selectedVariantId, designHash)
+    
+    if (cachedMockup && Object.keys(cachedMockup).length > 0) {
+      console.log('📦 Mockup encontrado en caché')
+      setVariantMockups((prev) => ({
+        ...prev,
+        [selectedVariantId]: Object.fromEntries(
+          Object.entries(cachedMockup).map(([placement, url]) => [placement, { url }])
+        )
+      }))
+      setStatusMessage('Mockup cargado desde caché')
+      toast.success('¡Mockup listo! (desde caché)')
+      return
+    }
+    
+    // Construir payload para generar mockup
+    const files = buildFilesPayload()
+    if (files.length === 0) {
+      toast.error('No hay diseños para generar mockup')
+      return
+    }
+    
+    const mockupTaskKey = `mockup_${selectedVariantId}_${Date.now()}`
+    activeTaskRef.current = { key: mockupTaskKey, variantId: selectedVariantId }
+    setGeneratingMockup(true)
+    setStatusMessage('Generando mockup...')
+    toast.loading('Generando mockup oficial de Printful...', { id: 'mockup-generation' })
+    
+    try {
+      const response = await fetch('/api/printful/mockup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productData.productId,
+          variantIds: [selectedVariantId],
+          files,
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'No pudimos iniciar la generación del mockup')
+      }
+      
+      const requestId = data.requestId
+      console.log('🎨 Mockup task iniciado:', requestId)
+      
+      // Iniciar polling
+      pollMockupStatus(requestId, selectedVariantId, 1)
+      
+    } catch (error) {
+      console.error('Error generating mockup:', error)
+      setGeneratingMockup(false)
+      activeTaskRef.current = null
+      toast.error('No pudimos generar el mockup. El diseño está guardado.', { id: 'mockup-generation' })
+      setStatusMessage('Diseño guardado (mockup no disponible)')
+    }
   }
 
   return (
@@ -1956,7 +2033,27 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
         </div>
 
         {/* �REAS DE IMPRESI�N - LO M�S PROMINENTE */}
-        {selectedItem && (
+        {/* CATALOG SELECTOR - Cuando no hay producto confirmado */}
+        {!confirmedProductId && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Selecciona un producto</h2>
+              <p className="text-sm text-gray-600">Elige el producto que quieres personalizar</p>
+            </div>
+            <CatalogSelector
+              selectedId={selectedProductId}
+              onSelect={setSelectedProductId}
+              fallbackItem={fallbackCatalogItem}
+              className="w-full"
+              autoCollapseOnSelect={false}
+              confirmedProductId={confirmedProductId}
+              onConfirmProduct={setConfirmedProductId}
+            />
+          </div>
+        )}
+
+        {/* ÁREAS DE IMPRESIÓN - Solo cuando hay producto confirmado */}
+        {confirmedProductId && selectedItem && (
           <div className="space-y-4">
             <div className="text-center">
               <h2 className="text-xl font-bold text-gray-900 mb-2">Selecciona d�nde colocar tu dise�o</h2>
