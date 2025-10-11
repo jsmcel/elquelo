@@ -619,25 +619,30 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const handleCopyDesignToQRs = async () => {
     if (!sourceDesign || selectedTargetQRs.length === 0) return
 
-    // Validar que todos los QRs destino tengan productos homogéneos
+    // Preparar los productos origen
     const sourceMigrated = migrateLegacyDesign(sourceDesign.designData)
-    const sourceProductIds = new Set(sourceMigrated.products.map(p => p.productId))
+    const sourceProducts = sourceMigrated.products || []
 
+    // Validar que no se copien diseños entre tipos de productos incompatibles
     for (const targetCode of selectedTargetQRs) {
       const targetDesign = designs[targetCode]?.designData
       if (targetDesign) {
         const targetMigrated = migrateLegacyDesign(targetDesign)
-        const targetProductIds = new Set(targetMigrated.products.map(p => p.productId))
+        const targetProducts = targetMigrated.products || []
         
-        // Verificar que ambos conjuntos sean iguales
-        const sameProducts = 
-          sourceProductIds.size === targetProductIds.size &&
-          Array.from(sourceProductIds).every(id => targetProductIds.has(id))
-        
-        if (!sameProducts) {
-          toast.error(`El QR ${targetCode} no tiene los mismos productos. Solo se pueden copiar diseños entre productos homogéneos.`)
-          setCopyingDesign(false)
-          return
+        // Si el destino tiene productos, verificar que sean del mismo tipo
+        if (targetProducts.length > 0) {
+          const sourceProductIds = new Set(sourceProducts.map(p => p.productId))
+          const targetProductIds = new Set(targetProducts.map(p => p.productId))
+          
+          // Verificar que haya al menos un producto en común
+          const hasCommonProducts = Array.from(sourceProductIds).some(id => targetProductIds.has(id))
+          
+          if (!hasCommonProducts && targetProducts.length > 0) {
+            toast.error(`El QR ${targetCode} tiene productos de tipo diferente. No se puede copiar el diseño de camisetas a tazas, etc.`)
+            setCopyingDesign(false)
+            return
+          }
         }
       }
     }
@@ -650,7 +655,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       )
 
       const copyPromises = targetQRs.map(async (targetQR) => {
-        // Obtener el diseño actual del QR destino para mantener sus tallas
+        // Obtener el diseño actual del QR destino
         const targetResponse = await fetch(`/api/design/${targetQR.code}`)
         const targetDesignData = targetResponse.ok ? (await targetResponse.json()).designData : null
         
@@ -661,21 +666,28 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         clonedDesign.targetQRCode = targetQR.code
         clonedDesign.targetQRUrl = targetQR.destination_url
         
-        // Mantener las tallas preexistentes del QR destino
-        if (targetDesignData && clonedDesign.products) {
+        // Copiar productos pero respetando tallas existentes en el destino
+        if (clonedDesign.products && targetDesignData) {
           const migratedTarget = migrateLegacyDesign(targetDesignData)
-          if (migratedTarget.products && migratedTarget.products.length > 0) {
-            // Usar las tallas del QR destino para cada producto
-            clonedDesign.products.forEach((product: any, index: number) => {
-              const targetProduct = migratedTarget.products[index]
-              if (targetProduct) {
-                product.size = targetProduct.size || 'M'
-                product.color = targetProduct.color || 'White'
-                product.variantId = targetProduct.variantId || product.variantId
-                product.colorCode = targetProduct.colorCode || product.colorCode
+          const targetProducts = migratedTarget.products || []
+          
+          if (targetProducts.length > 0) {
+            // Si el destino tiene productos, hacer match por productId y respetar sus tallas
+            clonedDesign.products.forEach((sourceProduct: any) => {
+              const matchingTargetProduct = targetProducts.find(
+                (tp: any) => tp.productId === sourceProduct.productId
+              )
+              
+              if (matchingTargetProduct) {
+                // Respetar la talla, color y variantId del QR destino
+                sourceProduct.size = matchingTargetProduct.size || sourceProduct.size
+                sourceProduct.color = matchingTargetProduct.color || sourceProduct.color
+                sourceProduct.colorCode = matchingTargetProduct.colorCode || sourceProduct.colorCode
+                sourceProduct.variantId = matchingTargetProduct.variantId || sourceProduct.variantId
               }
             })
           }
+          // Si el destino NO tiene productos, se copian tal cual del origen (ya están en clonedDesign)
         }
         
         // Regenerar archivos de QR para el nuevo QR
