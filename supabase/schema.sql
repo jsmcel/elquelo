@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.products (
 CREATE TABLE IF NOT EXISTS public.orders (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES public.users(id),
+  event_id UUID REFERENCES public.events(id),
   stripe_payment_intent_id TEXT UNIQUE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled')),
   total_amount DECIMAL(10,2) NOT NULL,
@@ -108,6 +109,9 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'qrs' AND column_name = 'group_id') THEN
     ALTER TABLE public.qrs ADD COLUMN group_id UUID REFERENCES public.groups(id);
   END IF;
+  IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'qrs' AND column_name = 'event_id') THEN
+    ALTER TABLE public.qrs ADD COLUMN event_id UUID REFERENCES public.events(id) ON DELETE SET NULL;
+  END IF;
 END $$;
 
 -- QR scans tracking
@@ -140,8 +144,11 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
 -- Events (for Eventos line)
 CREATE TABLE IF NOT EXISTS public.events (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  group_id UUID REFERENCES public.groups(id) ON DELETE CASCADE,
+  order_id UUID REFERENCES public.orders(id),
   name TEXT NOT NULL,
   description TEXT,
+  event_type TEXT DEFAULT 'despedida',
   event_date TIMESTAMP WITH TIME ZONE,
   organizer_name TEXT,
   organizer_email TEXT,
@@ -193,12 +200,16 @@ CREATE TABLE IF NOT EXISTS public.qr_designs (
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_event_id ON public.orders(event_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
 CREATE INDEX IF NOT EXISTS idx_qr_designs_qr_code ON public.qr_designs(qr_code);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON public.order_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_qrs_user_id ON public.qrs(user_id);
 CREATE INDEX IF NOT EXISTS idx_qrs_group_id ON public.qrs(group_id);
+CREATE INDEX IF NOT EXISTS idx_qrs_event_id ON public.qrs(event_id);
+CREATE INDEX IF NOT EXISTS idx_events_group_id ON public.events(group_id);
+CREATE INDEX IF NOT EXISTS idx_events_order_id ON public.events(order_id);
 CREATE INDEX IF NOT EXISTS idx_qrs_code ON public.qrs(code);
 CREATE INDEX IF NOT EXISTS idx_participants_group_id ON public.participants(group_id);
 CREATE INDEX IF NOT EXISTS idx_scans_qr_id ON public.scans(qr_id);

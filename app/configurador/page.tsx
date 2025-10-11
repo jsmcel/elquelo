@@ -113,6 +113,7 @@ export default function ConfiguratorPage() {
         destination_url: FALLBACK_QR_URL,
         description: normalizedGroupName ? `Kit ${normalizedGroupName}` : 'Kit personalizado',
         group: normalizedGroupName || undefined,
+        eventDate: eventDate || undefined, // Enviar fecha del evento
         selectedPackages: selectedPackages, // Enviar paquetes seleccionados
         members: participants.map((participant) => ({
           name: participant.name,

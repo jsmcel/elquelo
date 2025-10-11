@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       description,
       members,
       group: groupName,
+      eventDate, // Fecha del evento
       selectedPackages = [], // Paquetes seleccionados
     } = body
 
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
         .insert({
           name: trimmedGroupName,
           created_by: user.id,
+          // event_date: eventDate || null, // TODO: Agregar columna event_date a groups
         })
         .select('id')
         .single()

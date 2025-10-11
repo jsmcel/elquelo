@@ -58,69 +58,111 @@ export async function POST(req: NextRequest) {
 
         console.log('Order updated successfully:', order.id)
 
-        // CREAR GRUPO Y ASOCIAR QRs EXISTENTES
+        // CREAR LA DESPEDIDA (EVENTO) DESPUÉS DEL PAGO EXITOSO
         try {
-          console.log('Creating group and associating existing QRs...')
+          console.log('Creating despedida after successful payment...')
           
-          // Obtener los items de la orden para asociar los QRs
-          const { data: orderItems, error: itemsError } = await supabase
-            .from('order_items')
-            .select('*')
-            .eq('order_id', session.metadata?.order_id)
+          // 1. Buscar el grupo al que pertenecen los QRs del usuario
+          const { data: qrs, error: qrsError } = await supabase
+            .from('qrs')
+            .select('id, group_id')
+            .eq('user_id', session.metadata?.user_id)
+            .not('group_id', 'is', null)
+            .limit(1)
 
-          if (itemsError) {
-            console.error('Error fetching order items:', itemsError)
-          } else if (orderItems && orderItems.length > 0) {
-            // 1. Crear el grupo
+          if (qrsError) {
+            console.error('Error fetching QRs:', qrsError)
+          } else if (qrs && qrs.length > 0) {
+            const groupId = qrs[0].group_id
+            
+            // 2. Obtener información del grupo
             const { data: group, error: groupError } = await supabase
               .from('groups')
-              .insert({
-                name: `Despedida - ${new Date().toLocaleDateString()}`,
-                description: 'Despedida creada automáticamente después del pago',
-                created_by: session.metadata?.user_id,
-                created_at: new Date().toISOString()
-              })
-              .select()
+              .select('name, description')
+              .eq('id', groupId)
               .single()
 
             if (groupError) {
-              console.error('Error creating group:', groupError)
+              console.error('Error fetching group:', groupError)
             } else {
-              console.log('Group created successfully:', group.id)
-              
-              // 2. Asociar QRs existentes al grupo (buscar QRs del usuario)
-              const { data: userQRs, error: qrsError } = await supabase
-                .from('qrs')
-                .select('id, code')
-                .eq('user_id', session.metadata?.user_id)
-                .limit(orderItems.length)
+              // 3. Crear la despedida (evento) asociada al grupo
+              const { data: event, error: eventError } = await supabase
+                .from('events')
+                .insert({
+                  group_id: groupId,
+                  order_id: session.metadata?.order_id,
+                  name: group.name || `Despedida - ${new Date().toLocaleDateString()}`,
+                  description: group.description || 'Despedida creada automáticamente después del pago',
+                  event_date: session.metadata?.event_date || null, // Usar fecha de metadatos si está disponible
+                  event_type: 'despedida',
+                  organizer_name: session.customer_details?.name || 'Organizador',
+                  organizer_email: session.customer_email || '',
+                  is_active: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .select()
+                .single()
 
-              if (qrsError) {
-                console.error('Error fetching user QRs:', qrsError)
-              } else if (userQRs && userQRs.length > 0) {
-                // 3. Crear group_members para cada QR
-                const groupMembers = userQRs.map((qr, index) => ({
-                  group_id: group.id,
-                  qr_id: qr.id,
-                  role: index === 0 ? 'admin' : 'member',
-                  created_at: new Date().toISOString()
-                }))
+              if (eventError) {
+                console.error('Error creating event:', eventError)
+              } else {
+                console.log('Despedida created successfully:', event.id)
+                
+                // 4. Asociar el evento con la orden
+                const { error: updateOrderError } = await supabase
+                  .from('orders')
+                  .update({ 
+                    event_id: event.id,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', session.metadata?.order_id)
 
-                const { error: membersError } = await supabase
-                  .from('group_members')
-                  .insert(groupMembers)
-
-                if (membersError) {
-                  console.error('Error creating group members:', membersError)
+                if (updateOrderError) {
+                  console.error('Error updating order with event_id:', updateOrderError)
                 } else {
-                  console.log('Group members created successfully for', groupMembers.length, 'QRs')
+                  console.log('Order updated with event_id:', event.id)
+                }
+                
+                // 5. Asociar todos los QRs del grupo con el evento
+                const { error: updateQRsError } = await supabase
+                  .from('qrs')
+                  .update({ 
+                    event_id: event.id,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('group_id', groupId)
+
+                if (updateQRsError) {
+                  console.error('Error updating QRs with event_id:', updateQRsError)
+                } else {
+                  console.log('QRs updated with event_id:', event.id)
+                }
+                
+                // 6. Crear la relación del usuario con el evento en event_members
+                const { error: memberError } = await supabase
+                  .from('event_members')
+                  .insert({
+                    event_id: event.id,
+                    user_id: session.metadata?.user_id,
+                    role: 'owner',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  })
+
+                if (memberError) {
+                  console.error('Error creating event member:', memberError)
+                } else {
+                  console.log('Event member created successfully')
                 }
               }
             }
+          } else {
+            console.error('No group found for user QRs')
           }
-        } catch (groupError) {
-          console.error('Error creating group:', groupError)
-          // No fallar el webhook si la creación del grupo falla
+        } catch (despedidaError) {
+          console.error('Error creating despedida:', despedidaError)
+          // No fallar el webhook si la creación de la despedida falla
         }
 
         // Enviar pedido a Printful automáticamente
