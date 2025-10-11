@@ -18,9 +18,20 @@ export function ProductCard({ product, onEdit, onDelete, isDeleting = false }: P
   const isComplete = hasDesign && product.variantId && product.variantId !== 0
   
   // Obtener el primer mockup disponible para preview
-  const mockupUrl = hasMockup 
-    ? Object.values(product.variantMockups)[0]
-    : null
+  const mockupUrl = (() => {
+    if (!hasMockup || !product.variantMockups) return null
+    
+    // variantMockups: { [variantId]: { [placement]: { url, raw } } }
+    const firstVariantMockups = Object.values(product.variantMockups)[0]
+    if (!firstVariantMockups || typeof firstVariantMockups !== 'object') return null
+    
+    const firstPlacementMockup = Object.values(firstVariantMockups)[0]
+    if (!firstPlacementMockup) return null
+    
+    return typeof firstPlacementMockup === 'string' 
+      ? firstPlacementMockup 
+      : firstPlacementMockup?.url || null
+  })()
 
   // Nombre en español del producto
   const displayName = formatProductDisplayName(product.productId, product.size, product.color)
