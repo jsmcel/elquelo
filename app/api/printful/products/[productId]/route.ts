@@ -184,6 +184,7 @@ async function buildPlacementsAsync(files: any[] | undefined, printfilesData?: a
       
       // PASO 3b: Filtrar áreas que contengan "label" o "mockup" en su código
       if (rawCode.includes('label') || rawCode.includes('mockup')) {
+        console.log(`🚫 FILTRADO: Skipping placement "${rawCode}" (contains label/mockup)`)
         return // SKIP áreas de etiquetas y mockups (label_outside, mockup, etc.)
       }
       
@@ -236,6 +237,7 @@ async function buildPlacementsAsync(files: any[] | undefined, printfilesData?: a
       // Filtrar áreas que contengan "label" o "mockup"
       const lowerKey = placementKey.toLowerCase()
       if (lowerKey.includes('label') || lowerKey.includes('mockup')) {
+        console.log(`🚫 FILTRADO PRINTFILES: Skipping placement "${placementKey}" (contains label/mockup)`)
         return // SKIP áreas de etiquetas y mockups
       }
       

@@ -460,6 +460,13 @@ export function convertPrintfilesToPlacements(printfilesData: any, productId: nu
 
   // Procesar cada placement
   Object.entries(variantPrintfiles).forEach(([placementKey, printfileId]) => {
+    // FILTRAR: Saltar placements que contengan "label" o "mockup"
+    const lowerKey = placementKey.toLowerCase()
+    if (lowerKey.includes('label') || lowerKey.includes('mockup')) {
+      console.log(`🚫 FILTRADO PRINTFILES-DIMENSIONS: Skipping placement "${placementKey}" (contains label/mockup)`)
+      return
+    }
+    
     const pf = printfileMap.get(Number(printfileId))
     if (!pf) return
 
