@@ -6,6 +6,7 @@ import { QRProduct, QRDesignData, migrateLegacyDesign } from '@/types/qr-product
 import { toast } from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 import { Modal, ModalFooter } from './ui/Modal'
+import { getProductCategory, CATEGORY_INFO } from '@/lib/product-names'
 
 interface MultiProductDesignEditorProps {
   qrCode: string
@@ -97,35 +98,25 @@ export function MultiProductDesignEditor({
     }
   }
 
-  // Agrupar productos por categoría (tipo de producto)
+  // Agrupar productos por categoría usando el sistema de nombres
   const categorizedProducts = useMemo(() => {
-    const categories: Record<string, { name: string; icon: string; products: QRProduct[] }> = {
-      ropa: { name: 'Ropa', icon: '👕', products: [] },
-      accesorios: { name: 'Accesorios', icon: '🎒', products: [] },
-      hogar: { name: 'Hogar y Oficina', icon: '🏠', products: [] },
-      otros: { name: 'Otros', icon: '🎁', products: [] }
+    const categories: Record<string, { name: string; icon: string; description: string; products: QRProduct[] }> = {
+      ropa: { ...CATEGORY_INFO.ropa, products: [] },
+      accesorios: { ...CATEGORY_INFO.accesorios, products: [] },
+      hogar: { ...CATEGORY_INFO.hogar, products: [] },
+      otros: { ...CATEGORY_INFO.otros, products: [] }
     }
 
     products.forEach(product => {
-      // Categorizar por productId
-      if ([71, 145, 242].includes(product.productId)) {
-        // Camisetas, sudaderas, crop tops
-        categories.ropa.products.push(product)
-      } else if ([92, 382, 257, 259].includes(product.productId)) {
-        // Gorras, botellas, tote bags
-        categories.accesorios.products.push(product)
-      } else if ([19, 474, 1].includes(product.productId)) {
-        // Tazas, libretas, posters
-        categories.hogar.products.push(product)
-      } else {
-        categories.otros.products.push(product)
-      }
+      const category = getProductCategory(product.productId)
+      categories[category].products.push(product)
     })
 
-    // Filtrar categorías vacías
+    // Filtrar categorías vacías y ordenar por número de productos
     return Object.entries(categories)
       .filter(([_, cat]) => cat.products.length > 0)
       .map(([key, cat]) => ({ key, ...cat }))
+      .sort((a, b) => b.products.length - a.products.length) // Categorías con más productos primero
   }, [products])
 
   return (
@@ -159,13 +150,16 @@ export function MultiProductDesignEditor({
               <div key={category.key}>
                 {/* Header de categoría */}
                 <div className="mb-4 pb-2 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <span className="text-2xl">{category.icon}</span>
-                    {category.name}
-                    <span className="text-sm font-normal text-gray-500">
-                      ({category.products.length})
-                    </span>
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="text-2xl">{category.icon}</span>
+                      {category.name}
+                      <span className="text-sm font-normal text-gray-500">
+                        ({category.products.length})
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-500">{category.description}</p>
+                  </div>
                 </div>
 
                 {/* Grid de productos de esta categoría */}

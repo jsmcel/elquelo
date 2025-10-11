@@ -2,6 +2,7 @@
 
 import { QRProduct } from '@/types/qr-product'
 import { Edit2, Trash2, Check, AlertTriangle, Loader2, Package } from 'lucide-react'
+import { formatProductDisplayName, getProductInfo } from '@/lib/product-names'
 
 interface ProductCardProps {
   product: QRProduct
@@ -20,6 +21,10 @@ export function ProductCard({ product, onEdit, onDelete, isDeleting = false }: P
   const mockupUrl = hasMockup 
     ? Object.values(product.variantMockups)[0]
     : null
+
+  // Nombre en español del producto
+  const displayName = formatProductDisplayName(product.productId, product.size, product.color)
+  const productInfo = getProductInfo(product.productId)
 
   // Estado visual
   const getStatusColor = () => {
@@ -75,28 +80,16 @@ export function ProductCard({ product, onEdit, onDelete, isDeleting = false }: P
 
       {/* Info Area */}
       <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-2 truncate" title={product.productName}>
-          {product.productName}
+        {/* Emoji y nombre */}
+        <h3 className="font-semibold text-gray-900 mb-1 truncate flex items-center gap-2" title={displayName}>
+          {productInfo?.emoji && <span className="text-lg">{productInfo.emoji}</span>}
+          <span>{displayName}</span>
         </h3>
         
-        {/* Talla y Color */}
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          {product.size && (
-            <span className="px-2 py-1 bg-white border border-gray-200 rounded text-xs font-medium text-gray-700">
-              🏷️ {product.size}
-            </span>
-          )}
-          {product.color && product.colorCode && (
-            <span className="flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs font-medium text-gray-700">
-              <span
-                className="w-3 h-3 rounded-full border border-gray-300"
-                style={{ backgroundColor: product.colorCode }}
-                aria-label={`Color: ${product.color}`}
-              />
-              {product.color}
-            </span>
-          )}
-        </div>
+        {/* Descripción breve */}
+        {productInfo?.description && (
+          <p className="text-xs text-gray-500 mb-3">{productInfo.description}</p>
+        )}
 
         {/* Actions */}
         <div className="flex gap-2">

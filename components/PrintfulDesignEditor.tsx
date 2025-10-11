@@ -7,6 +7,7 @@ import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide
 import { toast } from 'react-hot-toast'
 import { Modal, ModalFooter } from './ui/Modal'
 import { calculateOptimalDimensions, ensureSquareQR, validatePosition } from '@/lib/printful-dimensions'
+import { getProductName } from '@/lib/product-names'
 
 // ========================================
 // MOCKUP CACHE UTILITIES
