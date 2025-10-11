@@ -88,17 +88,22 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
     'default': 'front',
     'front_print': 'front',
     'front_center': 'front',
+    'front center': 'front',
     'back': 'back',
     'back_print': 'back',
     'back_center': 'back',
+    'back center': 'back',
     'left': 'sleeve_left',
     'sleeve_left': 'sleeve_left',
     'left_sleeve': 'sleeve_left',
+    'left sleeve': 'sleeve_left',
     'right': 'sleeve_right',
     'sleeve_right': 'sleeve_right',
     'right_sleeve': 'sleeve_right',
+    'right sleeve': 'sleeve_right',
     'embroidery_left_chest': 'embroidery_left_chest',
     'embroidery_chest_left': 'embroidery_left_chest',
+    'embroidery chest left': 'embroidery_left_chest',
   }
   
   // PASO 2: Labels claros en español
@@ -140,7 +145,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
       
       // Normalizar el código de placement
       const normalizedCode = PLACEMENT_CODES[rawCode] || rawCode
-      const label = PLACEMENT_LABELS[normalizedCode] || file.title || normalizedCode
+      const label = PLACEMENT_LABELS[normalizedCode] || normalizedCode
       
       // Solo agregar si NO existe ya (deduplicación)
       if (!resultMap.has(normalizedCode)) {
@@ -196,7 +201,7 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
       if (!resultMap.has(normalizedCode)) {
         const printfileId = Number(printfileIdValue)
         const printfile = printfileLookup.get(printfileId)
-        const label = PLACEMENT_LABELS[normalizedCode] || availablePlacements[placementKey] || placementKey
+        const label = PLACEMENT_LABELS[normalizedCode] || normalizedCode
         const width = printfile?.width ? Number(printfile.width) : 3600
         const height = printfile?.height ? Number(printfile.height) : 4800
 
