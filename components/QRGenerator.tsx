@@ -1511,10 +1511,25 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
           qrCode: editingQR.code,
           lastUpdated: new Date().toISOString()
         }
-        const product = migratedDesign.products.find((p: QRProduct) => p.id === editingProductId)
+        let product = migratedDesign.products.find((p: QRProduct) => p.id === editingProductId)
         
+        // Si no existe, es un producto nuevo - crear uno temporal
         if (!product) {
-          return null
+          product = {
+            id: editingProductId,
+            productId: 71, // Default product
+            templateId: 71,
+            variantId: 0,
+            productName: 'Nuevo Producto',
+            size: null,
+            color: null,
+            colorCode: null,
+            designsByPlacement: {},
+            designMetadata: {},
+            variantMockups: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
         }
 
         return (
@@ -1525,6 +1540,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             onSave={handleSaveProductDesign}
             onBack={handleBackToDashboard}
             onCancel={() => {
+              // Si era un producto nuevo y se cancela, no hacer nada (no se añade a la lista)
               setEditorOpen(false)
               setEditingQR(null)
               setEditingProductId(null)

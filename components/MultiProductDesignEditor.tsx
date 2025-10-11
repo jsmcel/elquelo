@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ProductCard, AddProductCard } from './ProductCard'
 import { QRProduct, QRDesignData, migrateLegacyDesign } from '@/types/qr-product'
 import { toast } from 'react-hot-toast'
@@ -32,28 +32,15 @@ export function MultiProductDesignEditor({
   const [products, setProducts] = useState<QRProduct[]>(initialDesign.products)
   const [saving, setSaving] = useState(false)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
+  const [tempNewProductId, setTempNewProductId] = useState<string | null>(null) // Producto temporal en creación
 
   const handleAddProduct = () => {
-    // Crear nuevo producto vacío y abrir editor
-    const newProduct: QRProduct = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `product-${Date.now()}`,
-      productId: 71, // Default product
-      templateId: 71,
-      variantId: 0, // Se configurará en el editor
-      productName: 'Nuevo Producto',
-      size: null,
-      color: null,
-      colorCode: null,
-      designsByPlacement: {},
-      designMetadata: {},
-      variantMockups: {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-
-    // Añadir a la lista y abrir editor individual
-    setProducts(prev => [...prev, newProduct])
-    onEditProduct(newProduct.id)
+    // Crear ID temporal para el nuevo producto
+    const newProductId = crypto.randomUUID ? crypto.randomUUID() : `product-${Date.now()}`
+    setTempNewProductId(newProductId)
+    
+    // Abrir editor individual (pasando el ID del producto que se está creando)
+    onEditProduct(newProductId)
   }
 
   const handleDeleteProduct = (productId: string) => {
@@ -110,6 +97,37 @@ export function MultiProductDesignEditor({
     }
   }
 
+  // Agrupar productos por categoría (tipo de producto)
+  const categorizedProducts = useMemo(() => {
+    const categories: Record<string, { name: string; icon: string; products: QRProduct[] }> = {
+      ropa: { name: 'Ropa', icon: '👕', products: [] },
+      accesorios: { name: 'Accesorios', icon: '🎒', products: [] },
+      hogar: { name: 'Hogar y Oficina', icon: '🏠', products: [] },
+      otros: { name: 'Otros', icon: '🎁', products: [] }
+    }
+
+    products.forEach(product => {
+      // Categorizar por productId
+      if ([71, 145, 242].includes(product.productId)) {
+        // Camisetas, sudaderas, crop tops
+        categories.ropa.products.push(product)
+      } else if ([92, 382, 257, 259].includes(product.productId)) {
+        // Gorras, botellas, tote bags
+        categories.accesorios.products.push(product)
+      } else if ([19, 474, 1].includes(product.productId)) {
+        // Tazas, libretas, posters
+        categories.hogar.products.push(product)
+      } else {
+        categories.otros.products.push(product)
+      }
+    })
+
+    // Filtrar categorías vacías
+    return Object.entries(categories)
+      .filter(([_, cat]) => cat.products.length > 0)
+      .map(([key, cat]) => ({ key, ...cat }))
+  }, [products])
+
   return (
     <Modal
       isOpen={true}
@@ -118,7 +136,7 @@ export function MultiProductDesignEditor({
       description={`Código: ${qrCode}`}
       size="6xl"
     >
-      {/* Content - Grid de productos */}
+      {/* Content - Grid de productos por categorías */}
       <div className="flex-1 overflow-y-auto p-6">
         {products.length === 0 ? (
           <div className="text-center py-16">
@@ -135,20 +153,48 @@ export function MultiProductDesignEditor({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Cards de productos existentes */}
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onEdit={() => onEditProduct(product.id)}
-                onDelete={() => handleDeleteProduct(product.id)}
-                isDeleting={deletingProductId === product.id}
-              />
+          <div className="space-y-8">
+            {/* Renderizar cada categoría */}
+            {categorizedProducts.map((category) => (
+              <div key={category.key}>
+                {/* Header de categoría */}
+                <div className="mb-4 pb-2 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <span className="text-2xl">{category.icon}</span>
+                    {category.name}
+                    <span className="text-sm font-normal text-gray-500">
+                      ({category.products.length})
+                    </span>
+                  </h3>
+                </div>
+
+                {/* Grid de productos de esta categoría */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {category.products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onEdit={() => onEditProduct(product.id)}
+                      onDelete={() => handleDeleteProduct(product.id)}
+                      isDeleting={deletingProductId === product.id}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
             
-            {/* Card para añadir producto */}
-            <AddProductCard onClick={handleAddProduct} />
+            {/* Sección para añadir productos */}
+            <div>
+              <div className="mb-4 pb-2 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <span className="text-2xl">➕</span>
+                  Añadir Nuevo
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <AddProductCard onClick={handleAddProduct} />
+              </div>
+            </div>
           </div>
         )}
       </div>
