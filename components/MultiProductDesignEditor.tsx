@@ -88,8 +88,9 @@ export function MultiProductDesignEditor({
   }
 
   const handleSaveProductDesign = (designData: any) => {
-    console.log('🔄 Recibido designData:', designData?.designsByPlacement)
-    console.log('🔄 EditingProduct:', editingProduct?.designsByPlacement)
+    console.log('🔄 [MultiProductDesignEditor] Recibido designData:', designData?.designsByPlacement)
+    console.log('🔄 [MultiProductDesignEditor] EditingProduct:', editingProduct?.designsByPlacement)
+    console.log('🔄 [MultiProductDesignEditor] Full designData:', JSON.stringify(designData, null, 2))
 
     // Convertir el diseño al formato QRProduct
     const updatedProduct: QRProduct = {
@@ -121,7 +122,8 @@ export function MultiProductDesignEditor({
       updatedAt: new Date().toISOString()
     }
     
-    console.log('✅ Resultado final designsByPlacement:', updatedProduct.designsByPlacement)
+    console.log('✅ [MultiProductDesignEditor] Resultado final designsByPlacement:', updatedProduct.designsByPlacement)
+    console.log('✅ [MultiProductDesignEditor] Full updatedProduct:', JSON.stringify(updatedProduct, null, 2))
 
     // Validar que tiene variantId
     if (!updatedProduct.variantId || updatedProduct.variantId === 0) {
@@ -150,6 +152,9 @@ export function MultiProductDesignEditor({
   }
 
   const handleSaveAll = async () => {
+    console.log('💾 [MultiProductDesignEditor] handleSaveAll iniciado')
+    console.log('💾 [MultiProductDesignEditor] Products:', JSON.stringify(products, null, 2))
+    
     if (products.length === 0) {
       toast.error('Debes agregar al menos un producto')
       return

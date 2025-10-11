@@ -796,6 +796,10 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   }
 
   const uploadDesignToServer = async (code: string, designData: any) => {
+    console.log('📤 [QRGenerator] uploadDesignToServer iniciado')
+    console.log('📤 [QRGenerator] Code:', code)
+    console.log('📤 [QRGenerator] DesignData:', JSON.stringify(designData, null, 2))
+    
     setDesigns((prev) => ({
       ...prev,
       [code]: {
@@ -805,15 +809,18 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     }))
 
     try {
+      const payload = {
+        code,
+        designData
+      }
+      console.log('📤 [QRGenerator] Payload a enviar:', JSON.stringify(payload, null, 2))
+      
       const uploadResponse = await fetch('/api/design/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          code,
-          designData
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await uploadResponse.json()

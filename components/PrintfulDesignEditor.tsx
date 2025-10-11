@@ -1955,9 +1955,11 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       },
     }
 
-    console.log('💾 Guardando designsByPlacement:', designsByPlacement)
-    console.log('💾 Payload completo:', payload)
+    console.log('💾 [PrintfulDesignEditor] Guardando designsByPlacement:', designsByPlacement)
+    console.log('💾 [PrintfulDesignEditor] Payload completo:', JSON.stringify(payload, null, 2))
+    console.log('💾 [PrintfulDesignEditor] Llamando onSave con payload')
     onSave(payload)
+    console.log('💾 [PrintfulDesignEditor] onSave llamado exitosamente')
     toast.success('Diseño guardado')
   }
 

@@ -10,7 +10,10 @@ export async function POST(request: NextRequest) {
     console.log('=== DESIGN SAVE DEBUG ===')
     console.log('Code:', code)
     console.log('DesignData keys:', Object.keys(designData || {}))
+    console.log('DesignData.products:', designData?.products)
+    console.log('DesignData.designsByPlacement:', designData?.designsByPlacement)
     console.log('ProductOptions:', designData?.productOptions)
+    console.log('Full designData:', JSON.stringify(designData, null, 2))
     
     if (!code || !designData) {
       return NextResponse.json(
