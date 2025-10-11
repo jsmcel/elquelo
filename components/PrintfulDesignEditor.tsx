@@ -2012,7 +2012,8 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
           </div>
 
-          {confirmedItem && (
+        {/* Configuración de variante */}
+        {confirmedItem && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-4">
               <label className="block text-xs font-semibold text-gray-500">Talla</label>
