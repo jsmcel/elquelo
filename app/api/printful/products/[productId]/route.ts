@@ -238,20 +238,27 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
   // PASO 5: Marcar placements conflictivos (pero mantenerlos visibles)
   const finalPlacements = Array.from(resultMap.values())
   
+  console.log('📋 Final placements antes de conflictos:', finalPlacements.map(p => p.placement))
+  
   // Detectar conflictos front/front_large
   const hasFront = finalPlacements.some(p => p.placement === 'front')
   const hasFrontLarge = finalPlacements.some(p => p.placement === 'front_large')
   
+  console.log('🔍 hasFront:', hasFront, 'hasFrontLarge:', hasFrontLarge)
+  
   if (hasFront && hasFrontLarge) {
     console.log('⚠️ Detectado conflicto: front y front_large presentes')
     // Marcar como conflictivos pero mantener ambos visibles
-    return finalPlacements.map(placement => ({
+    const result = finalPlacements.map(placement => ({
       ...placement,
       isConflicting: placement.placement === 'front', // Marcar front como conflictivo
       conflictMessage: placement.placement === 'front' ? 'Conflicto con Frente Grande' : undefined
     }))
+    console.log('✅ Placements con conflictos marcados:', result.filter(p => p.isConflicting))
+    return result
   }
   
+  console.log('✅ No hay conflictos detectados, retornando placements normales')
   return finalPlacements
 }
 

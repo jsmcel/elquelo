@@ -1141,7 +1141,12 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     })
   }, [productData, savedDesignData, selectedProductId])
 
-  const placementList = useMemo(() => normalizePlacements(productData?.placements), [productData?.placements])
+  const placementList = useMemo(() => {
+    const normalized = normalizePlacements(productData?.placements)
+    console.log('📋 [PrintfulDesignEditor] placementList normalizado:', normalized)
+    console.log('🔍 [PrintfulDesignEditor] Placements con isConflicting:', normalized.filter(p => p.isConflicting))
+    return normalized
+  }, [productData?.placements])
 
 
 
