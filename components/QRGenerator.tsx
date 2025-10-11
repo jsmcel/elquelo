@@ -1406,19 +1406,21 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                         .filter(qr => qr.code !== sourceDesign.code)
                         .filter(qr => {
                           const targetDesign = designs[qr.code]?.designData
-                          if (!targetDesign) return false
+                          
+                          // CASO 1: QR sin diseño (siempre compatible)
+                          if (!targetDesign) {
+                            return true
+                          }
                           
                           const targetMigrated = migrateLegacyDesign(targetDesign)
                           const targetProducts = targetMigrated.products || []
                           
-                          // NUEVA LÓGICA: Permitir copia si:
-                          // 1. El QR destino tiene productos compatibles (mismo productId)
-                          // 2. O si el QR destino está vacío (sin productos)
+                          // CASO 2: QR con diseño vacío (siempre compatible)
                           if (targetProducts.length === 0) {
-                            return true // QR vacío, siempre compatible
+                            return true
                           }
                           
-                          // Verificar si hay al menos un producto compatible
+                          // CASO 3: Verificar si hay al menos un producto compatible
                           return sourceProducts.some(sourceProduct => 
                             targetProducts.some(targetProduct => 
                               targetProduct.productId === sourceProduct.productId
