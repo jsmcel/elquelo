@@ -2071,8 +2071,8 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                 <span className="font-semibold text-gray-900">{Object.keys(currentVariantMockups).length}</span>
               </p>
             </div>
-
-        </div>
+          </div>
+          )}
       </div>
 
       {/* Footer con botones sticky */}

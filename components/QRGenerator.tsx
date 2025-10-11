@@ -641,8 +641,8 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
           
           if (!hasCommonProducts && targetProducts.length > 0) {
             toast.error(`El QR ${targetCode} tiene productos de tipo diferente. No se puede copiar el diseño de camisetas a tazas, etc.`)
-            setCopyingDesign(false)
-            return
+          setCopyingDesign(false)
+          return
           }
         }
       }
@@ -1374,13 +1374,13 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         <Modal
           isOpen={true}
           onClose={() => {
-            setCopyDesignOpen(false)
-            setSourceDesign(null)
-            setSelectedTargetQRs([])
-          }}
+                  setCopyDesignOpen(false)
+                  setSourceDesign(null)
+                  setSelectedTargetQRs([])
+                }}
           title={`Copiar diseño - ${sourceDesign.code}`}
           size="2xl"
-        >
+              >
               <div className="space-y-4">
                 {/* Informacion del diseno origen */}
                 <div className="bg-blue-50 p-4 rounded-lg">
@@ -1468,36 +1468,37 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                     <div>- Si un QR ya tiene diseno, se sobrescribira</div>
                     <div>- Cada QR mantendra su URL unica pero con el mismo diseno</div>
                   </div>
+                  </div>
                 </div>
 
           <ModalFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
-            <button
-              onClick={() => {
-                setCopyDesignOpen(false)
-                setSourceDesign(null)
-                setSelectedTargetQRs([])
-              }}
+                  <button
+                    onClick={() => {
+                      setCopyDesignOpen(false)
+                      setSourceDesign(null)
+                      setSelectedTargetQRs([])
+                    }}
               className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleCopyDesignToQRs}
-              disabled={selectedTargetQRs.length === 0 || copyingDesign}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCopyDesignToQRs}
+                    disabled={selectedTargetQRs.length === 0 || copyingDesign}
               className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation flex items-center justify-center gap-2"
-            >
-              {copyingDesign ? (
-                <>
+                  >
+                    {copyingDesign ? (
+                      <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Copiando...
-                </>
-              ) : (
-                <>
+                        Copiando...
+                      </>
+                    ) : (
+                      <>
                   <Copy className="w-4 h-4" />
-                  Copiar a {selectedTargetQRs.length} QR(s)
-                </>
-              )}
-            </button>
+                        Copiar a {selectedTargetQRs.length} QR(s)
+                      </>
+                    )}
+                  </button>
           </ModalFooter>
         </Modal>
       )}
@@ -1548,11 +1549,11 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                               {product.color}
                             </span>
                           )}
-                        </div>
+              </div>
                         <p className="text-xs text-gray-500 mt-1">
                           Eliminado: {new Date(product.deletedAt).toLocaleString('es-ES')}
                         </p>
-                      </div>
+            </div>
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 ml-4 w-full sm:w-auto">
                         <button
                           onClick={async () => {
@@ -1589,8 +1590,8 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                         >
                           Eliminar
                         </button>
-                      </div>
-                    </div>
+          </div>
+        </div>
                   ))}
                 </div>
               )

@@ -148,12 +148,12 @@ export function MultiProductDesignEditor({
 
     setSaving(true)
     try {
-      const finalDesign: QRDesignData = {
-        version: '2.0',
-        products,
-        qrCode,
-        lastUpdated: new Date().toISOString()
-      }
+    const finalDesign: QRDesignData = {
+      version: '2.0',
+      products,
+      qrCode,
+      lastUpdated: new Date().toISOString()
+    }
 
       await onSave(finalDesign)
       toast.success('Diseño guardado correctamente')
@@ -174,21 +174,21 @@ export function MultiProductDesignEditor({
       size="7xl"
       fullHeight={true}
     >
-      {/* Content */}
+        {/* Content */}
       <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden">
-        {/* Sidebar - Lista de productos */}
+          {/* Sidebar - Lista de productos */}
         <div className="w-full lg:w-80 flex-shrink-0 overflow-y-auto">
-          <ProductListManager
-            products={products}
-            selectedProductId={selectedProductId}
-            onSelectProduct={handleSelectProduct}
-            onAddProduct={handleAddProduct}
-            onDeleteProduct={handleDeleteProduct}
+            <ProductListManager
+              products={products}
+              selectedProductId={selectedProductId}
+              onSelectProduct={handleSelectProduct}
+              onAddProduct={handleAddProduct}
+              onDeleteProduct={handleDeleteProduct}
             onEditProduct={handleEditProduct}
-          />
-        </div>
+            />
+          </div>
 
-        {/* Editor Area */}
+          {/* Editor Area */}
         <div className="flex-1 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center min-h-[400px] lg:min-h-0">
             {showEditor && editingProduct ? (
               <div className="w-full h-full relative">
@@ -201,24 +201,24 @@ export function MultiProductDesignEditor({
                     setEditingProduct(null)
                   }}
                   savedDesignData={{
-                    printfulProduct: {
-                      productId: editingProduct.productId,
-                      templateId: editingProduct.templateId,
+                          printfulProduct: {
+                            productId: editingProduct.productId,
+                            templateId: editingProduct.templateId,
                       variantId: editingProduct.variantId || 0,
-                      name: editingProduct.productName
-                    },
-                    printful: {
+                            name: editingProduct.productName
+                          },
+                          printful: {
                       variantId: editingProduct.variantId || 0,
-                      size: editingProduct.size,
-                      color: editingProduct.color,
-                      colorCode: editingProduct.colorCode,
-                      placements: editingProduct.designsByPlacement,
-                      designMetadata: editingProduct.designMetadata,
-                      variantMockups: editingProduct.variantMockups
-                    },
-                    designsByPlacement: editingProduct.designsByPlacement,
-                    designMetadata: editingProduct.designMetadata,
-                    variantMockups: editingProduct.variantMockups
+                            size: editingProduct.size,
+                            color: editingProduct.color,
+                            colorCode: editingProduct.colorCode,
+                            placements: editingProduct.designsByPlacement,
+                            designMetadata: editingProduct.designMetadata,
+                            variantMockups: editingProduct.variantMockups
+                          },
+                          designsByPlacement: editingProduct.designsByPlacement,
+                          designMetadata: editingProduct.designMetadata,
+                          variantMockups: editingProduct.variantMockups
                   }}
                 />
               </div>
@@ -313,14 +313,6 @@ export function MultiProductDesignEditor({
               </div>
             )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <div className="text-sm text-gray-600">
-            {products.length} producto{products.length !== 1 ? 's' : ''} configurado{products.length !== 1 ? 's' : ''}
-          </div>
-        </div>
       </div>
 
       {/* Footer con botón sticky */}
@@ -338,7 +330,7 @@ export function MultiProductDesignEditor({
           ) : (
             'Guardar Todo'
           )}
-        </button>
+            </button>
       </ModalFooter>
     </Modal>
   )

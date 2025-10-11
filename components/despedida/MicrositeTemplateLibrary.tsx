@@ -250,6 +250,7 @@ export const MicrositeTemplateLibrary: React.FC<MicrositeTemplateLibraryProps> =
                   ))}
                 </div>
               </div>
+            </div>
 
           <ModalFooter>
             <button
