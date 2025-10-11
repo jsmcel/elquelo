@@ -1,9 +1,17 @@
 const { createClient } = require('@supabase/supabase-js')
+require('dotenv').config()
 
-const supabase = createClient(
-  'https://xyz.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5eiIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE2NzM5NzQ4MDAsImV4cCI6MTk4OTU1MDgwMH0.example'
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing Supabase environment variables:')
+  console.error('- NEXT_PUBLIC_SUPABASE_URL')
+  console.error('- SUPABASE_SERVICE_ROLE_KEY')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 async function fixOrdersTable() {
   try {
