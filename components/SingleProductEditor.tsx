@@ -35,7 +35,7 @@ export function SingleProductEditor({
       isOpen={true}
       onClose={onCancel}
       title="" // Sin título, usamos breadcrumb
-      size="full"
+      size="7xl"
       fullHeight={true}
     >
       {/* Header con Breadcrumb y Botón Volver */}
