@@ -1504,23 +1504,15 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
 
       {/* Modal de Papelera de Productos */}
       {productTrashOpen && trashQRCode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Trash2 className="h-6 w-6 text-gray-700" />
-                <h2 className="text-2xl font-bold text-gray-900">Papelera de Productos</h2>
-              </div>
-              <button
-                onClick={() => {
-                  setProductTrashOpen(false)
-                  setTrashQRCode(null)
-                }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setProductTrashOpen(false)
+            setTrashQRCode(null)
+          }}
+          title="Papelera de Productos"
+          size="2xl"
+        >
 
             {(() => {
               const designState = designs[trashQRCode]
@@ -1561,7 +1553,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                           Eliminado: {new Date(product.deletedAt).toLocaleString('es-ES')}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 ml-4 w-full sm:w-auto">
                         <button
                           onClick={async () => {
                             // Restaurar producto
@@ -1572,7 +1564,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                             await uploadDesignToServer(trashQRCode, updatedDesign)
                             toast.success('Producto restaurado')
                           }}
-                          className="px-3 py-1.5 text-sm font-semibold text-green-600 border-2 border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+                          className="min-h-[44px] px-3 py-2 text-sm font-semibold text-green-600 border-2 border-green-200 rounded-lg hover:bg-green-50 transition-colors touch-manipulation"
                         >
                           Restaurar
                         </button>
@@ -1593,7 +1585,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                               }
                             }
                           }}
-                          className="px-3 py-1.5 text-sm font-semibold text-red-600 border-2 border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                          className="min-h-[44px] px-3 py-2 text-sm font-semibold text-red-600 border-2 border-red-200 rounded-lg hover:bg-red-50 transition-colors touch-manipulation"
                         >
                           Eliminar
                         </button>
@@ -1603,8 +1595,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                 </div>
               )
             })()}
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
