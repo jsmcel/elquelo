@@ -1396,11 +1396,11 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
 
                 {/* Seleccion de QRs destino */}
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">Seleccionar QRs destino (solo productos homogéneos)</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Seleccionar QRs destino (productos compatibles)</h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {(() => {
                       const sourceMigrated = migrateLegacyDesign(sourceDesign.designData)
-                      const sourceProductIds = new Set(sourceMigrated.products.map(p => p.productId))
+                      const sourceProducts = sourceMigrated.products || []
                       
                       const compatibleQRs = qrs
                         .filter(qr => qr.code !== sourceDesign.code)
@@ -1409,19 +1409,27 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                           if (!targetDesign) return false
                           
                           const targetMigrated = migrateLegacyDesign(targetDesign)
-                          const targetProductIds = new Set(targetMigrated.products.map(p => p.productId))
+                          const targetProducts = targetMigrated.products || []
                           
-                          // Verificar que ambos conjuntos sean iguales
-                          return (
-                            sourceProductIds.size === targetProductIds.size &&
-                            Array.from(sourceProductIds).every(id => targetProductIds.has(id))
+                          // NUEVA LÓGICA: Permitir copia si:
+                          // 1. El QR destino tiene productos compatibles (mismo productId)
+                          // 2. O si el QR destino está vacío (sin productos)
+                          if (targetProducts.length === 0) {
+                            return true // QR vacío, siempre compatible
+                          }
+                          
+                          // Verificar si hay al menos un producto compatible
+                          return sourceProducts.some(sourceProduct => 
+                            targetProducts.some(targetProduct => 
+                              targetProduct.productId === sourceProduct.productId
+                            )
                           )
                         })
                       
                       if (compatibleQRs.length === 0) {
                         return (
                           <div className="bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800">
-                            No hay QRs compatibles. Solo se pueden copiar diseños entre QRs que tengan exactamente los mismos productos.
+                            No hay QRs compatibles. Puedes copiar diseños a QRs vacíos o que tengan productos compatibles (mismo tipo de producto).
                           </div>
                         )
                       }
