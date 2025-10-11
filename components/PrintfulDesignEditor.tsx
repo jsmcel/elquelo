@@ -1928,58 +1928,48 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       }}
       title={productData?.name || 'Diseñador de Producto'}
       description={`QR: ${qrCode}`}
-      size="6xl"
+      size="7xl"
       fullHeight={true}
     >
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-4">
-            <CatalogSelector 
-              selectedId={selectedProductId} 
-              onSelect={handleProductChange} 
-              fallbackItem={fallbackCatalogItem}
-              confirmedProductId={confirmedProductId}
-              onConfirmProduct={setConfirmedProductId}
-            />
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">{productData?.name || 'Producto'}</h2>
-              <p className="text-sm text-gray-600">
-                QR <span className="font-semibold text-gray-900">{qrCode}</span>
-              </p>
-              {statusMessage && <p className="text-xs text-gray-500">{statusMessage}</p>}
-              {lastError && <p className="text-xs text-red-500">{lastError}</p>}
-            </div>
-
-            {/* Imagen del producto seleccionado */}
-            {selectedItem && (
-              <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Imagen del Producto</h3>
-                <div className="flex justify-center">
-                  {selectedItem.image ? (
-                    <img
-                      src={selectedItem.image}
-                      alt={selectedItem.name}
-                      className="max-h-64 w-auto rounded-lg object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
-                      <ImageIcon className="h-8 w-8" />
-                    </div>
-                  )}
-                </div>
-                <div className="mt-3 text-center text-xs text-gray-600">
-                  <p><strong>ID:</strong> {selectedItem.id}</p>
-                  <p><strong>Tipo:</strong> {selectedItem.type}</p>
-                  <p><strong>Marca:</strong> {selectedItem.brand}</p>
-                </div>
+      <div className="space-y-6">
+        {/* Header compacto - menos prominente */}
+        <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+          <div className="flex items-center gap-3">
+            {selectedItem?.image && (
+              <div className="h-10 w-10 overflow-hidden rounded bg-gray-100">
+                <img
+                  src={selectedItem.image}
+                  alt={selectedItem.name}
+                  className="h-full w-full object-contain"
+                />
               </div>
             )}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">{productData?.name || 'Producto'}</h3>
+              <p className="text-xs text-gray-500">QR: {qrCode}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            {statusMessage && <p className="text-xs text-blue-600">{statusMessage}</p>}
+            {lastError && <p className="text-xs text-red-500">{lastError}</p>}
+          </div>
+        </div>
+
+        {/* ÁREAS DE IMPRESIÓN - LO MÁS PROMINENTE */}
+        {selectedItem && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Selecciona dónde colocar tu diseño</h2>
+              <p className="text-sm text-gray-600">Haz clic en el área donde quieres colocar tu imagen o QR</p>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
             {selectedItem && (
               <div className="space-y-2">
                 <div className="text-xs text-gray-600">
                   Ãreas de impresiÃ³n disponibles ({placementList.length}):
                 </div>
-            <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2">
               {placementList.map((placement) => {
                 const isActive = activePlacement === placement.placement
                 const hasMockup = Boolean(currentVariantMockups[placement.placement])
@@ -2020,45 +2010,6 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
               </div>
             )}
 
-            <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-gray-200 bg-gray-50">
-              {loadingProduct ? (
-                <div className="flex flex-col items-center gap-3 text-sm text-gray-500">
-                  <Loader2 className="h-7 w-7 animate-spin text-primary-500" />
-                  <span>Conectando...</span>
-                </div>
-              ) : lastError ? (
-                <div className="space-y-3 text-center text-sm text-red-500">
-                  <p>{lastError}</p>
-                  <button
-                    className="rounded-full border border-red-200 px-4 py-1 text-xs font-semibold text-red-600"
-                    onClick={() => window.location.reload()}
-                  >
-                    Reintentar
-                  </button>
-                </div>
-              ) : currentMockupUrl ? (
-                <img
-                  src={currentMockupUrl}
-                  alt={`Mockup ${activePlacement}`}
-                  className="max-h-[240px] w-auto rounded-xl border border-gray-200 bg-white object-contain shadow-sm"
-                />
-              ) : designsByPlacement[activePlacement] ? (
-                <div className="text-center text-sm text-gray-600">
-                  <p>
-                    Diseeeeo listo para{' '}
-                    {placementList.find((item) => item.placement === activePlacement)?.label || activePlacement}.
-                  </p>
-                  <p className="mt-2 text-xs text-gray-500">
-                    El mockup se generará automáticamente al guardar el diseño.
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center text-sm text-gray-500">
-                  <ImageIcon className="mx-auto h-10 w-10 text-gray-300" />
-                  <p className="mt-2">Sube un diseeeeo para ver el mockup oficial.</p>
-                </div>
-              )}
-            </div>
           </div>
 
           {confirmedItem && (
