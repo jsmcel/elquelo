@@ -82,6 +82,34 @@ function resolveProductId(identifier: string): number | null {
 function buildPlacements(files: any[] | undefined, printfilesData?: any): PlacementEntry[] {
   const resultMap = new Map<string, PlacementEntry>()
   
+  // PASO 1: Normalizar placement codes
+  const PLACEMENT_CODES: Record<string, string> = {
+    'front': 'front',
+    'default': 'front',
+    'front_print': 'front',
+    'front_center': 'front',
+    'back': 'back',
+    'back_print': 'back',
+    'back_center': 'back',
+    'left': 'sleeve_left',
+    'sleeve_left': 'sleeve_left',
+    'left_sleeve': 'sleeve_left',
+    'right': 'sleeve_right',
+    'sleeve_right': 'sleeve_right',
+    'right_sleeve': 'sleeve_right',
+    'embroidery_left_chest': 'embroidery_left_chest',
+    'embroidery_chest_left': 'embroidery_left_chest',
+  }
+  
+  // PASO 2: Labels claros en español
+  const PLACEMENT_LABELS: Record<string, string> = {
+    'front': 'Frente',
+    'back': 'Espalda',
+    'sleeve_left': 'Manga Izquierda',
+    'sleeve_right': 'Manga Derecha',
+    'embroidery_left_chest': 'Bordado Pecho Izquierdo',
+  }
+  
   // Solo usar FALLBACK_PLACEMENTS si no hay datos específicos del producto
   const hasSpecificPlacements = Array.isArray(files) && files.length > 0
   const hasPrintfilesPlacements = printfilesData && printfilesData.variant_printfiles && 
@@ -91,40 +119,50 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
   
   if (!hasSpecificPlacements && !hasPrintfilesPlacements) {
     // Solo usar fallbacks si no hay áreas específicas del producto
-  FALLBACK_PLACEMENTS.forEach((entry) => resultMap.set(entry.placement, { ...entry }))
+    FALLBACK_PLACEMENTS.forEach((entry) => resultMap.set(entry.placement, { ...entry }))
   }
 
   if (Array.isArray(files)) {
     files.forEach((file) => {
-      const placementCode = String(file.type || file.id || file.placement || '').toLowerCase()
-      if (!placementCode) return
-      const width = Number(file.width) || 3600
-      const height = Number(file.height) || 4800
-      const existing = resultMap.get(placementCode) || {
-        placement: placementCode,
-        label: file.title || file.type || placementCode,
-        printfileId: file.id ?? file.printfile_id ?? null,
-        width,
-        height,
-        areaWidth: width,
-        areaHeight: height,
-        position: { top: 0, left: 0, width, height },
+      // PASO 3: Filtrar áreas con additional_price > 0
+      const additionalPrice = Number(file.additional_price || file.additionalPrice || 0)
+      if (additionalPrice > 0) {
+        return // SKIP áreas con precio adicional
       }
-      resultMap.set(placementCode, {
-        ...existing,
-        label: file.title || existing.label || placementCode,
-        printfileId: file.id ?? file.printfile_id ?? existing.printfileId,
-        width,
-        height,
-        areaWidth: width,
-        areaHeight: height,
-        position: {
-          top: Number(file.position?.top ?? existing.position.top),
-          left: Number(file.position?.left ?? existing.position.left),
-          width: Number(file.position?.width ?? file.width ?? existing.position.width),
-          height: Number(file.position?.height ?? file.height ?? existing.position.height),
-        },
-      })
+      
+      const rawCode = String(file.type || file.id || file.placement || '').toLowerCase()
+      if (!rawCode) return
+      
+      // PASO 3b: Filtrar áreas que contengan "label" o "mockup" en su código
+      if (rawCode.includes('label') || rawCode.includes('mockup')) {
+        return // SKIP áreas de etiquetas y mockups (label_outside, mockup, etc.)
+      }
+      
+      // Normalizar el código de placement
+      const normalizedCode = PLACEMENT_CODES[rawCode] || rawCode
+      const label = PLACEMENT_LABELS[normalizedCode] || file.title || normalizedCode
+      
+      // Solo agregar si NO existe ya (deduplicación)
+      if (!resultMap.has(normalizedCode)) {
+        const width = Number(file.width) || 3600
+        const height = Number(file.height) || 4800
+        
+        resultMap.set(normalizedCode, {
+          placement: normalizedCode,
+          label,
+          printfileId: file.id ?? file.printfile_id ?? null,
+          width,
+          height,
+          areaWidth: width,
+          areaHeight: height,
+          position: {
+            top: Number(file.position?.top ?? 0),
+            left: Number(file.position?.left ?? 0),
+            width: Number(file.position?.width ?? file.width ?? width),
+            height: Number(file.position?.height ?? file.height ?? height),
+          },
+        })
+      }
     })
   }
 
@@ -143,34 +181,36 @@ function buildPlacements(files: any[] | undefined, printfilesData?: any): Placem
       }
     })
 
+    // PASO 4: Agregar printfiles data (sin duplicar)
     Object.entries(variantPrintfiles).forEach(([placementKey, printfileIdValue]) => {
-      const printfileId = Number(printfileIdValue)
-      const printfile = printfileLookup.get(printfileId)
-      const label = availablePlacements[placementKey] || placementKey
-      const width = printfile?.width ? Number(printfile.width) : 3600
-      const height = printfile?.height ? Number(printfile.height) : 4800
-
-      const existing = resultMap.get(placementKey) || {
-        placement: placementKey,
-        label,
-        printfileId,
-        width,
-        height,
-        areaWidth: width,
-        areaHeight: height,
-        position: { top: 0, left: 0, width, height },
+      // Filtrar áreas que contengan "label" o "mockup"
+      const lowerKey = placementKey.toLowerCase()
+      if (lowerKey.includes('label') || lowerKey.includes('mockup')) {
+        return // SKIP áreas de etiquetas y mockups
       }
+      
+      // Normalizar el código de placement
+      const normalizedCode = PLACEMENT_CODES[placementKey] || placementKey
+      
+      // Solo agregar si NO existe ya (evitar duplicados)
+      if (!resultMap.has(normalizedCode)) {
+        const printfileId = Number(printfileIdValue)
+        const printfile = printfileLookup.get(printfileId)
+        const label = PLACEMENT_LABELS[normalizedCode] || availablePlacements[placementKey] || placementKey
+        const width = printfile?.width ? Number(printfile.width) : 3600
+        const height = printfile?.height ? Number(printfile.height) : 4800
 
-      resultMap.set(placementKey, {
-        ...existing,
-        label,
-        printfileId,
-        width,
-        height,
-        areaWidth: width,
-        areaHeight: height,
-        position: { top: 0, left: 0, width, height },
-      })
+        resultMap.set(normalizedCode, {
+          placement: normalizedCode,
+          label,
+          printfileId,
+          width,
+          height,
+          areaWidth: width,
+          areaHeight: height,
+          position: { top: 0, left: 0, width, height },
+        })
+      }
     })
   }
 

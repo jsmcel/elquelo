@@ -7,6 +7,113 @@ import { Loader2, RefreshCw, Upload, X, Check, Image as ImageIcon } from 'lucide
 import { toast } from 'react-hot-toast'
 import { Modal, ModalFooter } from './ui/Modal'
 
+// ========================================
+// MOCKUP CACHE UTILITIES
+// ========================================
+
+const MOCKUP_CACHE_KEY = 'printful_mockup_cache_v1'
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 horas
+const MAX_CACHE_ENTRIES = 50
+
+interface MockupCacheEntry {
+  variantId: number
+  designHash: string
+  mockups: Record<string, string>
+  timestamp: number
+}
+
+type MockupCache = Record<string, MockupCacheEntry>
+
+/**
+ * Calcula un hash simple del diseño basado en las imágenes por placement
+ */
+function hashDesign(designsByPlacement: Record<string, string>): string {
+  const sorted = Object.keys(designsByPlacement)
+    .sort()
+    .filter(key => designsByPlacement[key]) // Solo incluir placements con diseño
+  const serialized = sorted.map(key => `${key}:${designsByPlacement[key]}`).join('|')
+  
+  // Simple base64 hash (para algo más robusto, usar crypto.subtle.digest)
+  try {
+    return btoa(serialized)
+  } catch {
+    // Fallback para contenido no ASCII
+    return serialized
+  }
+}
+
+/**
+ * Obtiene un mockup desde la caché de localStorage
+ */
+function getCachedMockup(variantId: number, designHash: string): Record<string, string> | null {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const cacheStr = localStorage.getItem(MOCKUP_CACHE_KEY)
+    if (!cacheStr) return null
+    
+    const cache: MockupCache = JSON.parse(cacheStr)
+    const key = `${variantId}_${designHash}`
+    const entry = cache[key]
+    
+    if (!entry) return null
+    
+    // Verificar TTL
+    const isExpired = Date.now() - entry.timestamp > CACHE_TTL_MS
+    if (isExpired) {
+      // Eliminar entrada expirada
+      delete cache[key]
+      localStorage.setItem(MOCKUP_CACHE_KEY, JSON.stringify(cache))
+      return null
+    }
+    
+    return entry.mockups
+  } catch (error) {
+    console.error('Error reading mockup cache:', error)
+    return null
+  }
+}
+
+/**
+ * Guarda un mockup en la caché de localStorage
+ */
+function saveMockupToCache(
+  variantId: number,
+  designHash: string,
+  mockups: Record<string, string>
+): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const cacheStr = localStorage.getItem(MOCKUP_CACHE_KEY) || '{}'
+    const cache: MockupCache = JSON.parse(cacheStr)
+    const key = `${variantId}_${designHash}`
+    
+    cache[key] = {
+      variantId,
+      designHash,
+      mockups,
+      timestamp: Date.now(),
+    }
+    
+    // Limpiar entradas antiguas si excedemos el límite
+    const entries = Object.entries(cache)
+    if (entries.length > MAX_CACHE_ENTRIES) {
+      const sorted = entries.sort((a, b) => b[1].timestamp - a[1].timestamp)
+      const cleaned = Object.fromEntries(sorted.slice(0, MAX_CACHE_ENTRIES))
+      localStorage.setItem(MOCKUP_CACHE_KEY, JSON.stringify(cleaned))
+    } else {
+      localStorage.setItem(MOCKUP_CACHE_KEY, JSON.stringify(cache))
+    }
+  } catch (error) {
+    console.error('Error saving mockup cache:', error)
+  }
+}
+
+// ========================================
+// COMPONENT INTERFACES
+// ========================================
+
 interface PrintfulDesignEditorProps {
   // Short QR code identifier (e.g., ABC123) used for filenames/DB
   qrCode: string
@@ -1691,6 +1798,18 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
             placementsForVariant[placementKey] = { url: item.url, raw: rawEntry }
           })
           next[variantId] = placementsForVariant
+          
+          // GUARDAR EN CACHÉ el mockup recién generado
+          const currentHash = hashDesign(designsByPlacement)
+          const mockupsForCache: Record<string, string> = {}
+          Object.entries(placementsForVariant).forEach(([placement, data]) => {
+            if (data?.url) {
+              mockupsForCache[placement] = data.url
+            }
+          })
+          saveMockupToCache(variantId, currentHash, mockupsForCache)
+          console.log('💾 Mockup saved to cache for variant', variantId)
+          
           return next
         })
         setGeneratingMockup(false)
@@ -1719,12 +1838,35 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
   const requestMockup = async () => {
     if (!productData || !selectedVariantId) return
+    
+    // Calcular hash del diseño actual
+    const currentHash = hashDesign(designsByPlacement)
+    
+    // PASO 1: Verificar caché primero
+    const cached = getCachedMockup(selectedVariantId, currentHash)
+    if (cached) {
+      console.log('✅ Using cached mockup for variant', selectedVariantId)
+      // Convertir cached (Record<string, string>) a VariantMockups format
+      const cachedWithFormat: Record<string, { url: string; raw?: any }> = {}
+      Object.entries(cached).forEach(([placement, url]) => {
+        cachedWithFormat[placement] = { url, raw: undefined }
+      })
+      setVariantMockups(prev => ({
+        ...prev,
+        [selectedVariantId]: cachedWithFormat
+      }))
+      toast.success('Mockup cargado desde caché')
+      return
+    }
+    
+    // PASO 2: Si no hay caché, generar nuevo mockup
     const files = buildFilesPayload()
     if (!files.length) {
-      toast.error('Sube al menos un diseno antes de generar el mockup')
+      toast.error('Sube al menos un diseño antes de generar el mockup')
       return
     }
 
+    console.log('🔄 Generating new mockup for variant', selectedVariantId)
     setGeneratingMockup(true)
     setStatusMessage(null)
 
@@ -1741,7 +1883,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
       const data = await response.json()
       if (!response.ok || !data.success || !data.requestId) {
-        throw new Error(data.error || 'No se aceptÃ³ la tarea de mockup')
+        throw new Error(data.error || 'No se aceptó la tarea de mockup')
       }
 
       activeTaskRef.current = { key: data.requestId, variantId: selectedVariantId }
@@ -1755,8 +1897,10 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
   }
   const handleSave = () => {
     if (!productData) return
+    
+    // NUEVA VALIDACIÓN: QR obligatorio
     if (!qrPlaced) {
-      toast.error('Debes colocar el QR antes de guardar el diseÃ±o')
+      toast.error('⚠️ Debes colocar el QR en al menos una área del producto')
       return
     }
     
@@ -2063,7 +2207,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
             <div className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
               <p>
-                Diseeeeos cargados:{' '}
+                Diseños cargados:{' '}
                 <span className="font-semibold text-gray-900">{Object.values(designsByPlacement).filter(Boolean).length}</span>{' '}/ {placementList.length}
               </p>
               <p>
@@ -2086,10 +2230,10 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           </button>
           <button
             onClick={handleSave}
-            disabled={!hasAnyDesign || generatingMockup || uploading}
+            disabled={!qrPlaced || generatingMockup || uploading}
             className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
           >
-            Guardar diseño
+            {!qrPlaced ? '⚠️ Coloca el QR primero' : 'Guardar diseño'}
           </button>
         </div>
       </ModalFooter>
