@@ -96,15 +96,6 @@ export const PRODUCT_NAMES: Record<number, ProductNameInfo> = {
     description: 'Póster de alta calidad',
     category: 'hogar',
     emoji: '🖼️'
-  },
-  
-  // PLAYA Y VERANO
-  259: {
-    id: 259,
-    name: 'Toalla de Playa',
-    description: 'Toalla grande para la playa',
-    category: 'accesorios',
-    emoji: '🏖️'
   }
 }
 
