@@ -800,11 +800,10 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
 
     await uploadDesignToServer(editingQR.code, finalDesignData)
     
-    // Volver al dashboard
-    setPendingProductDefaults(null)
+    // Mantener editor abierto para seguir revisando
+    setPendingProductDefaults(updatedProduct)
     setPendingProductId(null)
     setProductPickerOpen(false)
-    setEditingProductId(null)
     toast.success('Producto guardado correctamente')
   }
 

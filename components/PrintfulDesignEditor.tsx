@@ -1982,13 +1982,8 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     // Guardar el diseño
     await onSave(payload)
     
-    // Mostrar éxito y cerrar
     toast.success('✅ Diseño guardado con éxito')
-    
-    // Cerrar el modal después de guardar
-    setTimeout(() => {
-      onClose()
-    }, 500) // Pequeño delay para que el usuario vea el mensaje de éxito
+    setStatusMessage('Diseño guardado correctamente')
   }
   
   // Nueva función que genera mockup y espera a que termine (retorna Promise)
