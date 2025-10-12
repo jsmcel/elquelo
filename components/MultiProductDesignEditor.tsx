@@ -14,6 +14,7 @@ interface MultiProductDesignEditorProps {
   onSave: (designData: QRDesignData) => void
   onClose: () => void
   onEditProduct: (productId: string) => void // Nueva prop para abrir editor individual
+  onAddProduct: () => void
   savedDesignData?: any
 }
 
@@ -23,6 +24,7 @@ export function MultiProductDesignEditor({
   onSave,
   onClose,
   onEditProduct,
+  onAddProduct,
   savedDesignData
 }: MultiProductDesignEditorProps) {
   // Migrar diseño legacy si es necesario
@@ -33,15 +35,9 @@ export function MultiProductDesignEditor({
   const [products, setProducts] = useState<QRProduct[]>(initialDesign.products)
   const [saving, setSaving] = useState(false)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
-  const [tempNewProductId, setTempNewProductId] = useState<string | null>(null) // Producto temporal en creación
 
   const handleAddProduct = () => {
-    // Crear ID temporal para el nuevo producto
-    const newProductId = crypto.randomUUID ? crypto.randomUUID() : `product-${Date.now()}`
-    setTempNewProductId(newProductId)
-    
-    // Abrir editor individual (pasando el ID del producto que se está creando)
-    onEditProduct(newProductId)
+    onAddProduct()
   }
 
   const handleDeleteProduct = (productId: string) => {

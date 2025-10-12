@@ -205,6 +205,7 @@ export async function POST(req: NextRequest) {
         // Create design entries for each QR and selected packages
         const designData = data.map((qr: any) => {
           const allProducts: any[] = []
+          const timestamp = new Date().toISOString()
           
           // Get participant info to determine if they are novio/novia
           const participant = members.find((m: any) => m.name === qr.title || m.name === qr.description)
@@ -214,7 +215,7 @@ export async function POST(req: NextRequest) {
           packagesToProcess.forEach(pkg => {
             // Skip novio/novia only packages if participant is not novio/novia
             if (pkg.onlyForNoviNovia && !isNovioNovia) {
-              console.log(`⏭️ Skipping package ${pkg.id} for non-novio/novia participant`)
+              console.log('⏭️ Skipping package ' + pkg.id + ' for non-novio/novia participant')
               return
             }
             
@@ -231,11 +232,12 @@ export async function POST(req: NextRequest) {
                 size: product.defaultSize || 'M',
                 color: product.defaultColor || 'White',
                 colorCode: product.defaultColorCode || '#FFFFFF',
+                unitPrice: realPrice,
                 designsByPlacement: {},
                 designMetadata: {},
                 variantMockups: {},
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                createdAt: timestamp,
+                updatedAt: timestamp
               })
             })
           })
@@ -243,6 +245,9 @@ export async function POST(req: NextRequest) {
           return {
             qr_code: qr.code,
             design_data: {
+              version: '2.0',
+              qrCode: qr.code,
+              lastUpdated: timestamp,
               type: 'default',
               text: qr.title || 'Mi QR',
               color: '#000000',
@@ -254,7 +259,7 @@ export async function POST(req: NextRequest) {
             product_size: 'M',
             product_color: 'White',
             product_gender: 'unisex',
-            created_at: new Date().toISOString(),
+            created_at: timestamp,
           }
         })
 
@@ -416,17 +421,64 @@ export async function POST(req: NextRequest) {
               console.log(`✅ QR uploaded for ${qr.code}:`, qrPublicUrl)
               
               // Update design data with QR placement and shared mockup
-              console.log(`🔍 Generic mockup URLs for ${qr.code}:`, JSON.stringify(genericMockupUrls, null, 2))
-              const updatedDesignData = {
-                type: 'default',
-                text: qr.title || 'Mi QR',
-                color: '#000000',
-                font: 'Arial',
-                size: 24,
-                position: { x: 50, y: 50 },
-                variant_id: 4013,
-                product_id: 71,
-                products: [{
+              console.log('🔍 Generic mockup URLs for ' + qr.code + ':', JSON.stringify(genericMockupUrls, null, 2))
+
+              const { data: designRecord, error: designFetchError } = await supabase
+                .from('qr_designs')
+                .select('design_data')
+                .eq('qr_code', qr.code)
+                .single()
+
+              if (designFetchError) {
+                console.error('❌ Error fetching design for ' + qr.code + ':', designFetchError)
+              }
+
+              const existingDesignData = designRecord?.design_data || {}
+              const existingProducts = Array.isArray(existingDesignData?.products)
+                ? existingDesignData.products
+                : []
+              const nowIso = new Date().toISOString()
+              const hasGenericMockups = !!(genericMockupUrls && Object.keys(genericMockupUrls).length > 0)
+
+              let productUpdated = false
+              const updatedProducts = existingProducts.map((product: any) => {
+                const shouldAttachQr = product?.productId === 71 || product?.variantId === 4013
+
+                if (!shouldAttachQr) {
+                  return product
+                }
+
+                productUpdated = true
+                const variantKey = product?.variantId || product?.productId || 4013
+
+                return {
+                  ...product,
+                  designsByPlacement: {
+                    ...(product.designsByPlacement || {}),
+                    front: qrPublicUrl,
+                  },
+                  designMetadata: {
+                    ...(product.designMetadata || {}),
+                    front: { width: 1800, height: 1800 },
+                  },
+                  variantMockups: hasGenericMockups
+                    ? {
+                        ...(product.variantMockups || {}),
+                        ...genericMockupUrls,
+                      }
+                    : {
+                        ...(product.variantMockups || {}),
+                        [variantKey]: {
+                          front: { url: qrPublicUrl },
+                        },
+                      },
+                  updatedAt: nowIso,
+                }
+              })
+
+              if (!productUpdated) {
+                const variantKey = 4013
+                updatedProducts.push({
                   id: crypto.randomUUID(),
                   productId: 71,
                   templateId: 71,
@@ -436,22 +488,37 @@ export async function POST(req: NextRequest) {
                   color: 'White',
                   colorCode: '#FFFFFF',
                   designsByPlacement: {
-                    front: qrPublicUrl
+                    front: qrPublicUrl,
                   },
                   designMetadata: {
-                    front: { width: 1800, height: 1800 }
+                    front: { width: 1800, height: 1800 },
                   },
-                  variantMockups: genericMockupUrls && Object.keys(genericMockupUrls).length > 0 
-                    ? genericMockupUrls 
+                  variantMockups: hasGenericMockups
+                    ? { ...genericMockupUrls }
                     : {
-                        // Fallback: create a simple mockup structure if Printful fails
-                        4013: {
-                          front: qrPublicUrl // Use the QR as a simple mockup
-                        }
+                        [variantKey]: {
+                          front: { url: qrPublicUrl },
+                        },
                       },
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                }]
+                  createdAt: nowIso,
+                  updatedAt: nowIso,
+                })
+              }
+
+              const updatedDesignData = {
+                ...existingDesignData,
+                version: existingDesignData?.version || '2.0',
+                type: existingDesignData?.type || 'default',
+                text: existingDesignData?.text || qr.title || 'Mi QR',
+                color: existingDesignData?.color || '#000000',
+                font: existingDesignData?.font || 'Arial',
+                size: existingDesignData?.size || 24,
+                position: existingDesignData?.position || { x: 50, y: 50 },
+                qrCode: existingDesignData?.qrCode || qr.code,
+                lastUpdated: nowIso,
+                variant_id: existingDesignData?.variant_id || 4013,
+                product_id: existingDesignData?.product_id || 71,
+                products: updatedProducts,
               }
 
               const { error: updateError } = await supabase

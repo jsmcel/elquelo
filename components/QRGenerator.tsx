@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { MultiProductDesignEditor } from './MultiProductDesignEditor'
 import { SingleProductEditor } from './SingleProductEditor'
+import { ProductSelectionModal } from './ProductSelectionModal'
+import type { ProductSelectionResult } from './ProductSelectionModal'
 import { QRProductsList } from './QRProductsList'
 import { ViewMultiProductDesignModal } from './ViewMultiProductDesignModal'
 import { Modal, ModalFooter } from './ui/Modal'
@@ -283,6 +285,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingQR, setEditingQR] = useState<QRRow | null>(null)
   const [editingProductId, setEditingProductId] = useState<string | null>(null) // Nuevo: ID del producto siendo editado
+  const [productPickerOpen, setProductPickerOpen] = useState(false)
+  const [pendingProductId, setPendingProductId] = useState<string | null>(null)
+  const [pendingProductDefaults, setPendingProductDefaults] = useState<QRProduct | null>(null)
   const [viewDesignOpen, setViewDesignOpen] = useState(false)
   const [viewingDesign, setViewingDesign] = useState<{ code: string; designData: any } | null>(null)
   const [copyDesignOpen, setCopyDesignOpen] = useState(false)
@@ -660,8 +665,60 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     // Esto evita cierres prematuros durante la generación de mockups
   }
 
+  const handleStartAddProduct = () => {
+    if (!editingQR) {
+      toast.error('Selecciona un QR antes de anadir productos')
+      return
+    }
+
+    const newProductId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `product-${Date.now()}`
+
+    setPendingProductId(newProductId)
+    setPendingProductDefaults(null)
+    setProductPickerOpen(true)
+  }
+
+  const handleCancelProductSelection = () => {
+    setProductPickerOpen(false)
+    setPendingProductId(null)
+    setPendingProductDefaults(null)
+  }
+
+  const handleProductSelection = (selection: ProductSelectionResult) => {
+    if (!editingQR || !pendingProductId) {
+      toast.error('No se pudo preparar el nuevo producto. Intentalo de nuevo.')
+      return
+    }
+
+    const nowIso = new Date().toISOString()
+    setPendingProductDefaults({
+      id: pendingProductId,
+      productId: selection.productId,
+      templateId: selection.templateId,
+      variantId: selection.defaultVariantId ?? 0,
+      productName: selection.name,
+      size: selection.defaultSize || null,
+      color: selection.defaultColor || null,
+      colorCode: selection.defaultColorCode || null,
+      designsByPlacement: {},
+      designMetadata: {},
+      variantMockups: {},
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    })
+
+    setProductPickerOpen(false)
+    setEditingProductId(pendingProductId)
+  }
+
   // Nuevo: Abrir editor individual para un producto específico
   const handleOpenSingleProductEditor = (productId: string) => {
+    setPendingProductDefaults(null)
+    setPendingProductId(productId)
+    setProductPickerOpen(false)
     setEditingProductId(productId)
     // El dashboard se cierra automáticamente (editorOpen sigue true)
   }
@@ -669,6 +726,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   // Nuevo: Volver del editor individual al dashboard
   const handleBackToDashboard = () => {
     setEditingProductId(null)
+    setPendingProductDefaults(null)
+    setPendingProductId(null)
+    setProductPickerOpen(false)
     // El dashboard se muestra automáticamente
   }
 
@@ -741,6 +801,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     await uploadDesignToServer(editingQR.code, finalDesignData)
     
     // Volver al dashboard
+    setPendingProductDefaults(null)
+    setPendingProductId(null)
+    setProductPickerOpen(false)
     setEditingProductId(null)
     toast.success('Producto guardado correctamente')
   }
@@ -1500,10 +1563,22 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             setEditorOpen(false)
             setEditingQR(null)
             setEditingProductId(null)
+            setPendingProductDefaults(null)
+            setPendingProductId(null)
+            setProductPickerOpen(false)
           }}
           onSave={handleEditorSave}
           onEditProduct={handleOpenSingleProductEditor}
+          onAddProduct={handleStartAddProduct}
           savedDesignData={designs[editingQR.code]?.designData}
+        />
+      )}
+
+      {productPickerOpen && editingQR && (
+        <ProductSelectionModal
+          isOpen={productPickerOpen}
+          onClose={handleCancelProductSelection}
+          onSelect={handleProductSelection}
         />
       )}
 
@@ -1520,20 +1595,24 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         
         // Si no existe, es un producto nuevo - crear uno temporal
         if (!product) {
-          product = {
-            id: editingProductId,
-            productId: 71, // Default product
-            templateId: 71,
-            variantId: 0,
-            productName: 'Producto',
-            size: null,
-            color: null,
-            colorCode: null,
-            designsByPlacement: {},
-            designMetadata: {},
-            variantMockups: {},
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+          if (pendingProductDefaults && pendingProductDefaults.id === editingProductId) {
+            product = pendingProductDefaults
+          } else {
+            product = {
+              id: editingProductId,
+              productId: 71, // Default product
+              templateId: 71,
+              variantId: 0,
+              productName: 'Producto',
+              size: null,
+              color: null,
+              colorCode: null,
+              designsByPlacement: {},
+              designMetadata: {},
+              variantMockups: {},
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
           }
         }
 
@@ -1549,6 +1628,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
               setEditorOpen(false)
               setEditingQR(null)
               setEditingProductId(null)
+              setPendingProductDefaults(null)
+              setPendingProductId(null)
+              setProductPickerOpen(false)
             }}
           />
         )
@@ -1814,3 +1896,4 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     </div>
   )
 }
+
