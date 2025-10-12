@@ -33,6 +33,7 @@ interface CatalogVariant {
 
 interface CatalogProduct {
   id: number
+  templateId?: number | null
   name: string
   type: string | null
   brand: string | null
@@ -53,6 +54,7 @@ interface CatalogResponse {
 
 interface ProductOption {
   id: number
+  templateId: number
   name: string
   brand: string | null
   type: string | null
@@ -172,8 +174,11 @@ function buildOption(product: CatalogProduct): ProductOption {
     variants.map((variant) => `${variant.color || ''} ${variant.size || ''}`).join(' '),
   ]
 
+  const templateId = Number(product.templateId || product.id)
+
   return {
-    id: product.id,
+    id: Number(product.id),
+    templateId: templateId > 0 ? templateId : Number(product.id),
     name: product.name,
     brand: product.brand,
     type: product.type,
@@ -350,8 +355,8 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
     }
 
     onSelect({
-      productId: activeOption.id,
-      templateId: activeOption.id,
+      productId: Number(activeOption.id),
+      templateId: activeOption.templateId,
       defaultVariantId: variant.id,
       defaultSize: variant.size || undefined,
       defaultColor: variant.color || undefined,

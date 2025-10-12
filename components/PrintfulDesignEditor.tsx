@@ -1117,17 +1117,12 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
   })
   const [confirmedProductId, setConfirmedProductId] = useState<number | null>(() => {
     const candidate = Number(savedDesignData?.printfulProduct?.productId || savedDesignData?.productId)
-    const productName = savedDesignData?.printfulProduct?.name || savedDesignData?.productName
     const variantId = savedDesignData?.printfulProduct?.variantId || savedDesignData?.printful?.variantId
-    
-    // Es un producto nuevo si:
-    // - No hay variantId o es 0 (indica producto no configurado)
-    // - O no hay designsByPlacement (producto sin diseño)
-    const isNewProduct = !variantId || variantId === 0 || 
-                        !savedDesignData?.designsByPlacement ||
-                        Object.keys(savedDesignData?.designsByPlacement || {}).length === 0
-    
-    if (Number.isFinite(candidate) && candidate > 0 && !isNewProduct) {
+    const hasVariant = Number.isFinite(variantId) && Number(variantId) > 0
+    const hasDesigns = !!(savedDesignData?.designsByPlacement &&
+      Object.keys(savedDesignData.designsByPlacement).length > 0)
+
+    if (Number.isFinite(candidate) && candidate > 0 && (hasVariant || hasDesigns)) {
       return candidate
     }
     return null // Producto nuevo o inválido, mostrar catálogo
@@ -1460,7 +1455,10 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       nextSize = productData.sizes[0] ?? ''
     }
 
-    let nextActivePlacement = 'front'
+    const defaultPlacement = placementList.find((placement) => !placement.isConflicting)?.placement
+      || placementList[0]?.placement
+      || 'front'
+    let nextActivePlacement = defaultPlacement
     if (
       matchesSavedProduct &&
       savedPrintful?.activePlacement &&
