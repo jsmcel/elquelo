@@ -287,7 +287,6 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const [editingProductId, setEditingProductId] = useState<string | null>(null) // Nuevo: ID del producto siendo editado
   const [productPickerOpen, setProductPickerOpen] = useState(false)
   const [pendingProductId, setPendingProductId] = useState<string | null>(null)
-  const [pendingProductDefaults, setPendingProductDefaults] = useState<QRProduct | null>(null)
   const [viewDesignOpen, setViewDesignOpen] = useState(false)
   const [viewingDesign, setViewingDesign] = useState<{ code: string; designData: any } | null>(null)
   const [copyDesignOpen, setCopyDesignOpen] = useState(false)
@@ -677,24 +676,31 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         : `product-${Date.now()}`
 
     setPendingProductId(newProductId)
-    setPendingProductDefaults(null)
     setProductPickerOpen(true)
   }
 
   const handleCancelProductSelection = () => {
     setProductPickerOpen(false)
     setPendingProductId(null)
-    setPendingProductDefaults(null)
   }
 
-  const handleProductSelection = (selection: ProductSelectionResult) => {
+  const handleProductSelection = async (selection: ProductSelectionResult) => {
     if (!editingQR || !pendingProductId) {
       toast.error('No se pudo preparar el nuevo producto. Intentalo de nuevo.')
       return
     }
 
     const nowIso = new Date().toISOString()
-    setPendingProductDefaults({
+
+    const currentDesignData = designs[editingQR.code]?.designData
+    const migratedDesign = currentDesignData ? migrateLegacyDesign(currentDesignData) : {
+      version: '2.0' as const,
+      products: [],
+      qrCode: editingQR.code,
+      lastUpdated: nowIso,
+    }
+
+    const newProduct: QRProduct = {
       id: pendingProductId,
       productId: selection.productId,
       templateId: selection.templateId,
@@ -708,15 +714,32 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       variantMockups: {},
       createdAt: nowIso,
       updatedAt: nowIso,
-    })
+    }
+
+    const updatedProducts = migratedDesign.products.filter((product) => product.id !== pendingProductId)
+    updatedProducts.push(newProduct)
+
+    const finalDesignData = {
+      ...migratedDesign,
+      products: updatedProducts,
+      lastUpdated: nowIso,
+    }
+
+    try {
+      await uploadDesignToServer(editingQR.code, finalDesignData)
+      toast.success('Producto anadido. Edita el diseno cuando quieras.')
+    } catch (error) {
+      console.error('Error anadiendo producto:', error)
+      toast.error('No pudimos anadir el producto. Intenta de nuevo.')
+      return
+    }
 
     setProductPickerOpen(false)
-    setEditingProductId(pendingProductId)
+    setPendingProductId(null)
   }
 
   // Nuevo: Abrir editor individual para un producto específico
   const handleOpenSingleProductEditor = (productId: string) => {
-    setPendingProductDefaults(null)
     setPendingProductId(productId)
     setProductPickerOpen(false)
     setEditingProductId(productId)
@@ -726,7 +749,6 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   // Nuevo: Volver del editor individual al dashboard
   const handleBackToDashboard = () => {
     setEditingProductId(null)
-    setPendingProductDefaults(null)
     setPendingProductId(null)
     setProductPickerOpen(false)
     // El dashboard se muestra automáticamente
@@ -799,12 +821,13 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     }
 
     await uploadDesignToServer(editingQR.code, finalDesignData)
-    
-    // Mantener editor abierto para seguir revisando
-    setPendingProductDefaults(updatedProduct)
+
     setPendingProductId(null)
     setProductPickerOpen(false)
+    setEditingProductId(null)
     toast.success('Producto guardado correctamente')
+    setViewingDesign({ code: editingQR.code, designData: finalDesignData })
+    setViewDesignOpen(true)
   }
 
   const handleViewDesign = (code: string) => {
@@ -1562,8 +1585,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             setEditorOpen(false)
             setEditingQR(null)
             setEditingProductId(null)
-            setPendingProductDefaults(null)
-            setPendingProductId(null)
+                    setPendingProductId(null)
             setProductPickerOpen(false)
           }}
           onSave={handleEditorSave}
@@ -1594,24 +1616,20 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         
         // Si no existe, es un producto nuevo - crear uno temporal
         if (!product) {
-          if (pendingProductDefaults && pendingProductDefaults.id === editingProductId) {
-            product = pendingProductDefaults
-          } else {
-            product = {
-              id: editingProductId,
-              productId: 71, // Default product
-              templateId: 71,
-              variantId: 0,
-              productName: 'Producto',
-              size: null,
-              color: null,
-              colorCode: null,
-              designsByPlacement: {},
-              designMetadata: {},
-              variantMockups: {},
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }
+          product = {
+            id: editingProductId,
+            productId: 71, // Default product
+            templateId: 71,
+            variantId: 0,
+            productName: 'Producto',
+            size: null,
+            color: null,
+            colorCode: null,
+            designsByPlacement: {},
+            designMetadata: {},
+            variantMockups: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }
         }
 
@@ -1627,8 +1645,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
               setEditorOpen(false)
               setEditingQR(null)
               setEditingProductId(null)
-              setPendingProductDefaults(null)
-              setPendingProductId(null)
+                        setPendingProductId(null)
               setProductPickerOpen(false)
             }}
           />
