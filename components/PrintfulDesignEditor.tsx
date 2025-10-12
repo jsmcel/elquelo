@@ -1982,8 +1982,8 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     // Guardar el diseño
     await onSave(payload)
     
-    toast.success('✅ Diseño guardado con éxito')
-    setStatusMessage('Diseño guardado correctamente')
+    toast.success('✅ Diseno guardado con éxito')
+    setStatusMessage('Diseno guardado correctamente')
   }
   
   // Nueva función que genera mockup y espera a que termine (retorna Promise)
@@ -2174,7 +2174,7 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
       setGeneratingMockup(false)
       activeTaskRef.current = null
       toast.error('No pudimos generar el mockup. El diseño está guardado.', { id: 'mockup-generation' })
-      setStatusMessage('Diseño guardado (mockup no disponible)')
+      setStatusMessage('Diseno guardado (mockup no disponible)')
     }
   }
 
