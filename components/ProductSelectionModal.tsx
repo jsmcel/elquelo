@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import { Modal, ModalFooter } from './ui/Modal'
 
 export interface ProductSelectionResult {
@@ -110,35 +111,6 @@ function resolveCategory(product: CatalogProduct): ProductCategory {
   }
 
   return 'otros'
-}
-
-function formatPrice(value: number | null): string | null {
-  if (value === null || Number.isNaN(value)) {
-    return null
-  }
-  if (USD_FORMATTER) {
-    return USD_FORMATTER.format(value)
-  }
-  return `USD ${value.toFixed(2)}`
-}
-
-function formatPriceRange(min: number | null, max: number | null): string {
-  const formattedMin = formatPrice(min)
-  const formattedMax = formatPrice(max)
-
-  if (formattedMin && formattedMax) {
-    if (Math.abs(Number(min) - Number(max)) < 0.01) {
-      return formattedMin
-    }
-    return `${formattedMin} - ${formattedMax}`
-  }
-  if (formattedMin) {
-    return `Desde ${formattedMin}`
-  }
-  if (formattedMax) {
-    return `Hasta ${formattedMax}`
-  }
-  return 'Precio no disponible'
 }
 
 function normalizeVariants(raw: CatalogProduct['variants']): CatalogVariant[] {
