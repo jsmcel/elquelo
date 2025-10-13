@@ -1883,63 +1883,50 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
 
   const handleSave = async () => {
     if (!productData) return
-    
-    // NUEVA VALIDACIÓN: QR obligatorio
-    if (!qrPlaced) {
-      toast.error('❌ Debes colocar el QR en al menos una área del producto')
-      return
-    }
-    
-    // Verificar que hay al menos un diseño (puede ser solo QR)
-    const hasDesigns = Object.values(designsByPlacement).some(Boolean)
-    if (!hasDesigns) {
-      toast.error('No hay diseños para guardar')
-      return
-    }
 
-    // Verificar que hay una variante seleccionada
+    const hasDesigns = Object.values(designsByPlacement).some(Boolean)
+
     if (!selectedVariantId) {
       toast.error('Debes seleccionar una talla y color')
       return
     }
 
-    // PRIMERO: Generar el mockup si no existe o no está actualizado
-    const designHash = hashDesign(designsByPlacement)
-    const cachedMockup = getCachedMockup(selectedVariantId, designHash)
-    
     let finalMockups = variantMockups
-    
-    // Si no hay mockup en caché o está desactualizado, generar uno nuevo
-    if (!cachedMockup || Object.keys(cachedMockup).length === 0) {
-      toast.loading('Generando mockup oficial de Printful...', { id: 'mockup-save' })
-      
-      try {
-        // Generar mockup y esperar a que termine
-        const mockups = await generateMockupAndWait()
-        if (mockups) {
-          finalMockups = mockups
-          toast.success('¡Mockup generado con éxito!', { id: 'mockup-save' })
-        } else {
+
+    if (hasDesigns) {
+      const designHash = hashDesign(designsByPlacement)
+      const cachedMockup = getCachedMockup(selectedVariantId, designHash)
+
+      if (!cachedMockup || Object.keys(cachedMockup).length === 0) {
+        toast.loading('Generando mockup oficial de Printful...', { id: 'mockup-save' })
+
+        try {
+          const mockups = await generateMockupAndWait()
+          if (mockups) {
+            finalMockups = mockups
+            toast.success('Mockup generado con exito', { id: 'mockup-save' })
+          } else {
+            toast.dismiss('mockup-save')
+            toast('No se pudo generar el mockup, pero el diseno se guardara', { icon: '⚠️' })
+          }
+        } catch (error) {
+          console.error('Error generando mockup:', error)
           toast.dismiss('mockup-save')
-          toast('No se pudo generar el mockup, pero el diseño se guardará', { icon: '⚠️' })
+          toast('Error al generar mockup, pero el diseno se guardara', { icon: '⚠️' })
         }
-      } catch (error) {
-        console.error('Error generando mockup:', error)
-        toast.dismiss('mockup-save')
-        toast('Error al generar mockup, pero el diseño se guardará', { icon: '⚠️' })
+      } else {
+        finalMockups = {
+          ...variantMockups,
+          [selectedVariantId]: Object.fromEntries(
+            Object.entries(cachedMockup).map(([placement, url]) => [placement, { url }])
+          )
+        }
+        console.log('Usando mockup de cache')
       }
     } else {
-      // Usar mockup de caché
-      finalMockups = {
-        ...variantMockups,
-        [selectedVariantId]: Object.fromEntries(
-          Object.entries(cachedMockup).map(([placement, url]) => [placement, { url }])
-        )
-      }
-      console.log('📦 Usando mockup de caché')
+      finalMockups = {}
     }
 
-    // SEGUNDO: Guardar el diseño con el mockup incluido
     const payload = {
       editorType: 'printful',
       qrCode,
@@ -1982,8 +1969,8 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
     // Guardar el diseño
     await onSave(payload)
     
-    toast.success('✅ Diseno guardado con éxito')
-    setStatusMessage('Diseno guardado correctamente')
+    toast.success('Diseno guardado con exito')
+    setStatusMessage(hasDesigns ? 'Diseno guardado correctamente' : 'Producto actualizado. Agrega disenos cuando quieras.')
   }
   
   // Nueva función que genera mockup y espera a que termine (retorna Promise)
