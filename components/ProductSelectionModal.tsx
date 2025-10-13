@@ -91,10 +91,6 @@ const REGION_LABELS: Record<string, string> = {
 
 const PRICE_SEPARATOR = ' | '
 
-const USD_FORMATTER = typeof Intl !== 'undefined'
-  ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
-  : null
-
 function resolveCategory(product: CatalogProduct): ProductCategory {
   const haystack = [product.type, product.name, product.brand].filter(Boolean).join(' ').toLowerCase()
 
@@ -198,9 +194,6 @@ function getVariantLabel(variant: CatalogVariant): string {
   if (variant.color) parts.push(variant.color)
   if (variant.size) parts.push(variant.size)
   if (!parts.length) parts.push('Variante estandar')
-
-  const price = formatPrice(variant.price)
-  if (price) parts.push(price)
 
   if (variant.matchedRegion) {
     const label = REGION_LABELS[variant.matchedRegion] || variant.matchedRegion
@@ -426,7 +419,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {items.map((option) => {
                       const isActive = activeOption?.id === option.id
-                      const priceRange = formatPriceRange(option.priceMin, option.priceMax)
                       return (
                         <button
                           key={option.id}
@@ -451,10 +443,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
                             <div className="flex-1">
                               <h4 className="text-sm font-semibold text-gray-900">{option.name}</h4>
                               <div className="mt-1 text-xs text-gray-500">
-                                {option.brand && <span>{option.brand}{PRICE_SEPARATOR}</span>}
+                                {option.brand && <span>{option.brand}</span>}
                                 {option.type && <span>{option.type.toLowerCase()}</span>}
                               </div>
-                              <div className="mt-2 text-sm font-medium text-orange-700">{priceRange}</div>
                               <div className="mt-1 text-xs text-gray-500">
                                 {option.variantCount} variantes | {option.placements.join(', ') || 'Sin placements definidos'}
                               </div>
@@ -478,8 +469,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
               <div>
                 <div className="text-sm font-semibold text-gray-900">{activeOption.name}</div>
                 <div className="text-xs text-gray-500">
-                  {activeOption.brand && `${activeOption.brand}${PRICE_SEPARATOR}`}
-                  {formatPriceRange(activeOption.priceMin, activeOption.priceMax)}
+                  {activeOption.brand || ''}
                 </div>
               </div>
               <div className="flex flex-col gap-2 md:flex-row md:items-center">
