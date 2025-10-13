@@ -335,26 +335,46 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
 
   const handleChooseProduct = (optionId: number) => {
     setActiveOptionId(optionId)
-  }
+  
 
-  const handleConfirmSelection = () => {
-    if (!activeOption || selectedVariantId === null) {
+  const handleDirectSelect = (option: ProductOption) => {
+    const firstVariant = option.variants[0]
+    setActiveOptionId(option.id)
+    setSelectedVariantId(firstVariant?.id ?? null)
+
+    if (firstVariant) {
+      handleConfirmSelection(option, firstVariant.id)
+    } else {
+      toast.error('Este producto no tiene variantes disponibles en este momento')
+    }
+  }
+}
+
+  const handleConfirmSelection = (optionOverride?: ProductOption, variantOverrideId?: number) => {
+    const optionToUse = optionOverride ?? activeOption
+    const variantIdToUse = variantOverrideId ?? selectedVariantId
+
+    if (!optionToUse || variantIdToUse === null || variantIdToUse === undefined) {
+      toast.error('Selecciona una variante disponible')
       return
     }
 
-    const variant = activeOption.variants.find((item) => item.id === selectedVariantId)
+    const variant = optionToUse.variants.find((item) => item.id === variantIdToUse)
+      || optionToUse.variants[0]
+
     if (!variant) {
+      toast.error('Este producto no tiene variantes disponibles ahora mismo')
       return
     }
 
     onSelect({
-      productId: Number(activeOption.id),
-      templateId: activeOption.templateId,
+      productId: Number(optionToUse.id),
+      templateId: optionToUse.templateId,
       defaultVariantId: variant.id,
       defaultSize: variant.size || undefined,
       defaultColor: variant.color || undefined,
       defaultColorCode: variant.colorCode || undefined,
-      name: activeOption.name,
+      name: optionToUse.name,
     })
   }
 
@@ -424,6 +444,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
                           key={option.id}
                           type="button"
                           onClick={() => handleChooseProduct(option.id)}
+                          onDoubleClick={() => handleDirectSelect(option)}
                           className={`flex w-full flex-col items-stretch gap-3 rounded-xl border p-4 text-left transition ${
                             isActive ? 'border-orange-400 bg-orange-50 shadow-md' : 'border-gray-200 bg-white hover:border-orange-300 hover:shadow'
                           }`}
@@ -442,9 +463,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
                             </div>
                             <div className="flex-1">
                               <h4 className="text-sm font-semibold text-gray-900">{option.name}</h4>
-                              <div className="mt-1 text-xs text-gray-500">
+                              <div className="mt-1 text-xs text-gray-500 space-x-1">
                                 {option.brand && <span>{option.brand}</span>}
-                                {option.type && <span>{option.type.toLowerCase()}</span>}
+                                {option.type && <span className="text-gray-400">· {option.type.toLowerCase()}</span>}
                               </div>
                               <div className="mt-1 text-xs text-gray-500">
                                 {option.variantCount} variantes | {option.placements.join(', ') || 'Sin placements definidos'}
@@ -468,8 +489,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
             <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div>
                 <div className="text-sm font-semibold text-gray-900">{activeOption.name}</div>
-                <div className="text-xs text-gray-500">
-                  {activeOption.brand || ''}
+                <div className="text-xs text-gray-500 space-x-1">
+                  {activeOption.brand && <span>{activeOption.brand}</span>}
+                  {activeOption.type && <span className="text-gray-400">· {activeOption.type.toLowerCase()}</span>}
                 </div>
               </div>
               <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -501,7 +523,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
             </button>
             <button
               type="button"
-              onClick={handleConfirmSelection}
+              onClick={() => handleConfirmSelection()}
               disabled={!activeOption || selectedVariantId === null}
               className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 md:w-auto"
             >
