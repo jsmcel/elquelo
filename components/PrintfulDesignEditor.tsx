@@ -2386,12 +2386,6 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
                     </label>
                   )}
                   
-                  {/* Mensaje informativo */}
-                  {!qrPlaced && (
-                    <p className="text-xs text-gray-500 text-center">
-                      Primero coloca el QR, después puedes agregar imágenes
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -2421,10 +2415,10 @@ export function PrintfulDesignEditor({ qrCode, qrContent, onSave, onClose, saved
           </button>
           <button
             onClick={handleSave}
-            disabled={!qrPlaced || generatingMockup || uploading}
+            disabled={generatingMockup || uploading}
             className="w-full sm:flex-1 min-h-[44px] rounded-full bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation flex items-center justify-center gap-2"
           >
-            {!qrPlaced ? '?? Coloca el QR primero' : 'Guardar dise�o y generar mockup'}
+            {'Guardar diseno y generar mockup'}
           </button>
         </div>
       </ModalFooter>
