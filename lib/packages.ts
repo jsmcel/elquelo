@@ -65,7 +65,7 @@ export const PACKAGES: Record<string, PackageConfig> = {
     id: 'novio',
     title: 'Gadgets para el Novio',
     emoji: '💍',
-    description: 'Pack premium: Taza + Gorra + Botella',
+    description: 'Pack premium: Taza + Botella',
     products: [
       { 
         productId: 19, 
@@ -76,16 +76,6 @@ export const PACKAGES: Record<string, PackageConfig> = {
         defaultColor: 'White',
         defaultColorCode: '#FFFFFF',
         estimatedPrice: 14
-      },
-      { 
-        productId: 92, 
-        defaultVariantId: 0, // NO TIENE VARIANT ID válido - usar técnica embroidery
-        placement: 'embroidery_front', // NO 'front'
-        name: 'Gorra 5 Panel',
-        defaultSize: 'One size',
-        defaultColor: 'Black',
-        defaultColorCode: '#000000',
-        estimatedPrice: 21
       },
       { 
         productId: 382, 
@@ -102,7 +92,7 @@ export const PACKAGES: Record<string, PackageConfig> = {
     onlyForNoviNovia: true,
     targetGender: 'male',
     isMultiProduct: true,
-    estimatedTotalPrice: 53
+    estimatedTotalPrice: 32
   },
   novia: {
     id: 'novia',

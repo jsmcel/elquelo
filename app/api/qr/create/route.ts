@@ -38,6 +38,53 @@ async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promis
   throw new Error('Max retries exceeded for rate limiting')
 }
 
+// Función para consultar mockup en biblioteca
+async function getMockupFromLibrary(
+  supabase: any,
+  productId: number,
+  variantId: number,
+  color: string
+) {
+  const { data, error } = await supabase
+    .from('mockup_library')
+    .select('*')
+    .eq('product_id', productId)
+    .eq('variant_id', variantId)
+    .eq('color', color)
+    .single()
+
+  if (error) return null
+  return data
+}
+
+// Función para guardar mockup en biblioteca
+async function saveMockupToLibrary(
+  supabase: any,
+  productId: number,
+  variantId: number,
+  color: string,
+  size: string,
+  mockupUrls: any,
+  templateQrUrl: string,
+  productName: string
+) {
+  const { data, error } = await supabase
+    .from('mockup_library')
+    .upsert({
+      product_id: productId,
+      variant_id: variantId,
+      color: color,
+      size: size,
+      mockup_urls: mockupUrls,
+      template_qr_url: templateQrUrl,
+      product_name: productName
+    }, {
+      onConflict: 'product_id,variant_id,color'
+    })
+
+  return { data, error }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -333,113 +380,138 @@ export async function POST(req: NextRequest) {
             const templateQrPublicUrl = templateUrlData.publicUrl
             console.log(`✅ Template QR uploaded:`, templateQrPublicUrl)
             
-            // Generate mockups for all selected package products
+            // Recolectar productos únicos para generar mockups
             const MOCKUP_BLACKLIST = [92] // Solo Gorra - problemas con embroidery
-            const mockupPromises = packagesToProcess.map(async (pkg) => {
-              return Promise.all(pkg.products.map(async (product) => {
-                // Skip productos sin ID válido
-                if (!product.productId || product.productId === 0) {
-                  console.log(`⏭️  Skipping product with invalid ID`)
-                  return null
+            const uniqueProducts = new Map()
+            
+            packagesToProcess.forEach(pkg => {
+              pkg.products.forEach(product => {
+                if (!product.productId || product.productId === 0) return
+                if (MOCKUP_BLACKLIST.includes(product.productId)) return
+                if (product.placement?.includes('embroidery')) return
+                
+                const key = `${product.productId}-${product.defaultVariantId}-${product.defaultColor}`
+                if (!uniqueProducts.has(key)) {
+                  uniqueProducts.set(key, product)
                 }
-                
-                // Skip productos en blacklist
-                if (MOCKUP_BLACKLIST.includes(product.productId)) {
-                  console.log(`⏭️  Skipping blacklisted product ${product.productId}`)
-                  return null
-                }
-                
-                // Skip productos de bordado/embroidery
-                if (product.placement?.includes('embroidery')) {
-                  console.log(`⏭️  Skipping embroidery product ${product.productId}`)
-                  return null
-                }
-                
-                // Use default variant ID or fallback to product ID
-                const variantId = product.defaultVariantId && product.defaultVariantId !== 0 
-                  ? product.defaultVariantId 
-                  : product.productId
-                
-                console.log(`🎨 Generating mockup for product ${product.productId}, variant ${variantId}`)
-                
-                const mockupResponse = await fetchWithRetry(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
+              })
+            })
+
+            console.log(`📚 Unique products to process: ${uniqueProducts.size}`)
+
+            // Procesar cada producto único
+            const mockupCache: any = {}
+            for (const [key, product] of Array.from(uniqueProducts.entries())) {
+              const variantId = product.defaultVariantId && product.defaultVariantId !== 0 
+                ? product.defaultVariantId 
+                : product.productId
+              
+              // 1. Buscar en biblioteca
+              const cached = await getMockupFromLibrary(
+                supabase,
+                product.productId,
+                variantId,
+                product.defaultColor
+              )
+              
+              if (cached) {
+                console.log(`✅ Using cached mockup for ${key}`)
+                mockupCache[key] = cached.mockup_urls
+                continue
+              }
+              
+              // 2. Generar nuevo mockup
+              console.log(`🎨 Generating NEW mockup for ${key}`)
+              
+              // Delay para evitar rate limiting
+              await new Promise(resolve => setTimeout(resolve, 15000))
+              
+              const mockupResponse = await fetchWithRetry(
+                `${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`,
+                {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     productId: product.productId,
                     variantIds: [variantId],
-                      files: [{
-                        placement: product.placement || 'front',
-                        imageUrl: templateQrPublicUrl,
-                        position: {
-                          top: 800,
-                          left: 800,
-                          width: 1800,
-                          height: 1800,
-                          areaWidth: 3600,
-                          areaHeight: 4800,
-                        }
-                      }]
-                    })
-                  })
-
-                  if (mockupResponse.ok) {
-                    const mockupData = await mockupResponse.json()
-                    const taskKey = mockupData.requestId
-                    console.log(`✅ Mockup task created for product ${product.productId}:`, taskKey)
-                    
-                    // Poll for mockup completion (max 10 attempts, 2 seconds each)
-                    for (let attempt = 0; attempt < 10; attempt++) {
-                      await new Promise(resolve => setTimeout(resolve, 2000))
-                      
-                        const statusResponse = await fetchWithRetry(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup/status?taskKey=${taskKey}`, {
-                          method: 'GET'
-                        })
-                      if (statusResponse.ok) {
-                        const statusData = await statusResponse.json()
-                        
-                        if (statusData.status === 'completed' && statusData.result) {
-                          console.log(`✅ Mockup completed for product ${product.productId}`)
-                          
-                          // Store mockup URLs by variant ID
-                          return {
-                            productId: product.productId,
-                            variantId: variantId,
-                            mockupUrls: statusData.result
-                          }
-                        } else if (statusData.status === 'failed') {
-                          console.error(`❌ Mockup failed for product ${product.productId}:`, statusData.error)
-                          break
-                        }
+                    files: [{
+                      placement: product.placement || 'front',
+                      imageUrl: templateQrPublicUrl,
+                      position: {
+                        top: 800,
+                        left: 800,
+                        width: 1800,
+                        height: 1800,
+                        areaWidth: 3600,
+                        areaHeight: 4800,
                       }
-                    }
-                  } else {
-                    console.error(`❌ Failed to create mockup task for product ${product.productId}`)
-                  }
-                return null
-              }))
-            })
-
-            // Wait for all mockup generation to complete
-            const allMockupResults = await Promise.all(mockupPromises)
-            const flatMockupResults = allMockupResults.flat().filter(result => result !== null)
-            
-            // Build generic mockup URLs from all successful mockups
-            flatMockupResults.forEach(result => {
-              if (result) {
-                Object.entries(result.mockupUrls).forEach(([placement, mockupData]: [string, any]) => {
-                  if (!genericMockupUrls[result.variantId]) {
-                    genericMockupUrls[result.variantId] = {}
-                  }
-                  genericMockupUrls[result.variantId][placement] = {
-                    url: mockupData.url,
-                    raw: mockupData
-                  }
-                })
+                    }]
+                  })
+                }
+              )
+              
+              if (!mockupResponse.ok) {
+                console.log(`❌ Failed to create mockup for ${key}`)
+                continue
               }
+              
+              const mockupData = await mockupResponse.json()
+              const taskKey = mockupData.requestId
+              
+              if (!taskKey) continue
+              
+              // Polling para obtener resultado
+              let mockupUrls = null
+              for (let i = 0; i < 30; i++) {
+                await new Promise(resolve => setTimeout(resolve, 2000))
+                
+                const statusResponse = await fetchWithRetry(
+                  `${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup/status?taskKey=${taskKey}`,
+                  { method: 'GET' }
+                )
+                
+                if (statusResponse.ok) {
+                  const statusData = await statusResponse.json()
+                  if (statusData.status === 'completed' && statusData.result) {
+                    mockupUrls = statusData.result
+                    break
+                  }
+                }
+              }
+              
+              if (mockupUrls) {
+                // 3. Guardar en biblioteca
+                await saveMockupToLibrary(
+                  supabase,
+                  product.productId,
+                  variantId,
+                  product.defaultColor,
+                  product.defaultSize,
+                  mockupUrls,
+                  templateQrPublicUrl,
+                  product.name
+                )
+                
+                mockupCache[key] = mockupUrls
+                console.log(`💾 Saved mockup to library for ${key}`)
+              }
+            }
+
+            // 4. Construir genericMockupUrls desde el cache
+            Object.entries(mockupCache).forEach(([key, mockupUrls]: [string, any]) => {
+              const [productId, variantId] = key.split('-')
+              if (!genericMockupUrls[variantId]) {
+                genericMockupUrls[variantId] = {}
+              }
+              Object.entries(mockupUrls).forEach(([placement, mockupData]: [string, any]) => {
+                genericMockupUrls[variantId][placement] = {
+                  url: mockupData.url,
+                  raw: mockupData
+                }
+              })
             })
             
-            console.log(`✅ Generated mockups for ${flatMockupResults.length} products`)
+            console.log(`✅ Generated mockups for ${Object.keys(mockupCache).length} unique products`)
           } catch (error) {
             console.error(`❌ Error generating generic mockup:`, error)
           }
