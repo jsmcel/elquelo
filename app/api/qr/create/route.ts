@@ -230,6 +230,10 @@ export async function POST(req: NextRequest) {
         
         // Start background mockup generation (don't await)
         console.log('🚀 Starting background mockup generation...')
+        console.log('🚀 Data length:', data.length)
+        console.log('🚀 Members length:', members.length)
+        console.log('🚀 Selected packages:', selectedPackages)
+        
         generateMockupsInBackground(data, members, selectedPackages, cookies()).catch(error => {
           console.error('❌ Background mockup generation failed:', error)
         })
@@ -437,5 +441,6 @@ async function generateMockupsInBackground(data: any[], members: any[], selected
     console.log('✅ Background mockup generation completed for all QRs')
   } catch (error) {
     console.error('❌ Error in background mockup generation:', error)
+    console.error('❌ Error stack:', error.stack)
   }
 }
