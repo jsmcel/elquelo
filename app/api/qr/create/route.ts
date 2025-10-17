@@ -441,6 +441,8 @@ async function generateMockupsInBackground(data: any[], members: any[], selected
     console.log('✅ Background mockup generation completed for all QRs')
   } catch (error) {
     console.error('❌ Error in background mockup generation:', error)
-    console.error('❌ Error stack:', error.stack)
+    if (error instanceof Error) {
+      console.error('❌ Error stack:', error.stack)
+    }
   }
 }
