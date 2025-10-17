@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ensureUserProfile, generateQrCodeValue, buildDefaultDestination, generateUniqueDestinationUrl } from '@/lib/user-profile'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { getAllPackages } from '@/lib/packages'
+import { generateMockupsForQrs } from '@/lib/mockup-generation'
 
 type MemberPayload = {
   name?: string
@@ -52,11 +53,11 @@ export async function POST(req: NextRequest) {
 
     // Multiple QRs creation
     if (members && members.length > 0) {
-      console.log('🔍 Selected packages:', selectedPackages)
-      console.log('🔍 Members length:', members.length)
+      console.log('ðŸ” Selected packages:', selectedPackages)
+      console.log('ðŸ” Members length:', members.length)
       
       if (selectedPackages.length > 0 && members && members.length > 0) {
-        console.log('✅ Creating products for', selectedPackages.length, 'packages and', members.length, 'participants')
+        console.log('âœ… Creating products for', selectedPackages.length, 'packages and', members.length, 'participants')
         
         // Get all variant IDs from selected packages
         const allVariantIds: number[] = []
@@ -85,13 +86,13 @@ export async function POST(req: NextRequest) {
               pricesData = JSON.parse(responseText)
             }
           } else {
-            console.error('❌ Printful prices API failed:', printfulPrices.status, printfulPrices.statusText)
+            console.error('âŒ Printful prices API failed:', printfulPrices.status, printfulPrices.statusText)
           }
         } catch (error) {
-          console.error('❌ Error fetching Printful prices:', error)
+          console.error('âŒ Error fetching Printful prices:', error)
           pricesData = [] // Fallback to empty array
         }
-        console.log('💰 Printful prices:', pricesData)
+        console.log('ðŸ’° Printful prices:', pricesData)
         
         // Create QRs for each member
         const qrPromises = members.map(async (member: MemberPayload) => {
@@ -148,14 +149,14 @@ export async function POST(req: NextRequest) {
             
             // Skip this package if it's only for novio/novia but participant is not novio/novia
             if (isNovioNoviaPackage && !isParticipantNovioNovia) {
-              console.log(`⏭️  Skipping package ${pkg.id} for participant ${participant?.name} (not novio/novia)`)
+              console.log(`â­ï¸  Skipping package ${pkg.id} for participant ${participant?.name} (not novio/novia)`)
               return
             }
             
             // Novios/novias get ALL packages (both regular and exclusive)
             // Only skip if package is exclusive to novio/novia but participant is not novio/novia
             
-            console.log(`✅ Adding package ${pkg.id} for participant ${participant?.name} (novio/novia: ${isParticipantNovioNovia})`)
+            console.log(`âœ… Adding package ${pkg.id} for participant ${participant?.name} (novio/novia: ${isParticipantNovioNovia})`)
             
             pkg.products.forEach(product => {
               if (product.defaultVariantId && product.defaultVariantId !== 0) {
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
 
           // If no products were added, add a default t-shirt
           if (products.length === 0) {
-            console.log(`⚠️  No products added for participant ${participant?.name}, adding default t-shirt`)
+            console.log(`âš ï¸  No products added for participant ${participant?.name}, adding default t-shirt`)
             products.push({
               id: crypto.randomUUID(),
               productId: 71,
@@ -223,27 +224,34 @@ export async function POST(req: NextRequest) {
           .insert(designData)
 
         if (productsError) {
-          console.error('❌ Error creating products:', productsError)
+          console.error('âŒ Error creating products:', productsError)
         } else {
-          console.log('✅ Successfully created', designData.length, 'design entries')
+          console.log('âœ… Successfully created', designData.length, 'design entries')
         }
         
-        // Start background mockup generation (don't await)
-        console.log('🚀 Starting background mockup generation...')
-        console.log('🚀 Data length:', data.length)
-        console.log('🚀 Members length:', members.length)
-        console.log('🚀 Selected packages:', selectedPackages)
-        
-        generateMockupsInBackground(data, members, selectedPackages, cookies()).catch(error => {
-          console.error('❌ Background mockup generation failed:', error)
-        })
-        
-        // Return success response
+        const pendingMockupCodes = data.map((item) => item?.code).filter(Boolean) as string[]
+
+        if (
+          pendingMockupCodes.length &&
+          process.env.MOCKUP_AUTOGENERATE_MODE === 'inline' &&
+          process.env.NEXT_PUBLIC_APP_URL
+        ) {
+          try {
+            await generateMockupsForQrs({
+              qrs: data,
+              cookieStore: () => cookieStore,
+              appUrl: process.env.NEXT_PUBLIC_APP_URL,
+            })
+          } catch (error) {
+            console.error('Inline mockup generation failed:', error)
+          }
+        }
+
         return NextResponse.json({
           success: true,
-          message: 'QRs creados exitosamente. Los mockups aparecerán en unos minutos.',
-          data: data,
-          mockupsGenerating: true
+          message: 'QRs creados exitosamente. Genera los mockups oficiales cuando quieras desde el panel.',
+          data,
+          pendingMockupCodes,
         })
       } else {
         // No packages selected - return error
@@ -258,197 +266,5 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Background function to generate mockups
-async function generateMockupsInBackground(data: any[], members: any[], selectedPackages: string[], cookies: any) {
-  try {
-    console.log('🎨 Starting background mockup generation for', data.length, 'QRs')
-    console.log('🎨 Selected packages:', selectedPackages)
-    console.log('🎨 Members:', members.length)
-    
-    // Create Supabase client for background processing
-    const supabase = createRouteHandlerClient({ cookies: () => cookies })
-    
-    // Get packages to process
-    const packagesToProcess = getAllPackages().filter(pkg => selectedPackages.includes(pkg.id))
-    
-    // Generate individual mockups for each QR
-    console.log(`🎨 Starting to process ${data.length} QRs`)
-    for (const qr of data) {
-      try {
-        console.log(`🎨 Processing QR: ${qr.code}`)
-        console.log(`🎨 QR title: ${qr.title}, description: ${qr.description}`)
-        
-        // Generate QR image for this specific QR
-        console.log(`🎨 Generating QR image for ${qr.code}`)
-        const { generateStandardQR } = await import('@/lib/qr-generator')
-        const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/qr/${qr.code}`
-        console.log(`🎨 QR URL: ${qrUrl}`)
-        const qrDataUrl = await generateStandardQR(qrUrl)
-        console.log(`🎨 QR image generated successfully`)
-        
-        // Convert data URL to Buffer
-        const base64Data = qrDataUrl.split(',')[1]
-        const qrBuffer = Buffer.from(base64Data, 'base64')
-        
-        // Upload QR to Supabase Storage
-        console.log(`🎨 Uploading QR to storage for ${qr.code}`)
-        const fileName = `${qr.code}-front-qr.png`
-        const filePath = `designs/${fileName}`
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('designs')
-          .upload(filePath, qrBuffer, {
-            contentType: 'image/png',
-            upsert: true,
-          })
 
-        if (uploadError) {
-          console.error(`❌ Error uploading QR for ${qr.code}:`, uploadError)
-          continue
-        }
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('designs')
-          .getPublicUrl(filePath)
-        
-        const qrPublicUrl = urlData.publicUrl
-        console.log(`✅ QR uploaded for ${qr.code}:`, qrPublicUrl)
-        
-        // Get design data for this QR
-        const { data: designRecord, error: designFetchError } = await supabase
-          .from('qr_designs')
-          .select('design_data')
-          .eq('qr_code', qr.code)
-          .single()
-
-        if (designFetchError) {
-          console.error('❌ Error fetching design for ' + qr.code + ':', designFetchError)
-          continue
-        }
-
-        const existingDesignData = designRecord?.design_data || {}
-        const existingProducts = Array.isArray(existingDesignData?.products)
-          ? existingDesignData.products
-          : []
-
-        // Find participant for this QR
-        const participant = members.find((m: any) => {
-          const memberName = m.name || ''
-          const qrTitle = qr.title || ''
-          const qrDescription = qr.description || ''
-          return memberName === qrTitle || 
-                 memberName === qrDescription ||
-                 qrTitle.includes(memberName) ||
-                 qrDescription.includes(memberName)
-        })
-
-        // Generate mockups for each product of this QR
-        for (const product of existingProducts) {
-          try {
-            console.log(`🎨 Generating mockup for product ${product.productId}, variant ${product.variantId}`)
-            
-            // Request mockup with this specific QR
-            const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                productId: product.productId,
-                variantIds: [product.variantId],
-                files: [{
-                  placement: 'front',
-                  imageUrl: qrPublicUrl,
-                  position: {
-                    top: 600,
-                    left: 600,
-                    width: product.designMetadata?.front?.width || 1800,
-                    height: product.designMetadata?.front?.height || 1800,
-                    areaWidth: 3600,
-                    areaHeight: 4800,
-                  }
-                }]
-              })
-            })
-
-            if (mockupResponse.ok) {
-              const mockupData = await mockupResponse.json()
-              const taskKey = mockupData.requestId
-              console.log(`✅ Mockup task created for product ${product.productId}:`, taskKey)
-              
-              // Poll for mockup completion (max 10 attempts, 2 seconds each)
-              for (let attempt = 0; attempt < 10; attempt++) {
-                await new Promise(resolve => setTimeout(resolve, 2000))
-                
-                const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup?requestId=${taskKey}`)
-                if (!statusResponse.ok) continue
-                
-                const statusData = await statusResponse.json()
-                
-                if (statusData.status === 'completed' && statusData.normalizedMockups) {
-                  // Update the product with the real mockup
-                  const normalizedArray = statusData.normalizedMockups
-                  const productMockups: any = {}
-                  
-                  normalizedArray.forEach((mockup: any) => {
-                    const variantId = mockup.variantId
-                    const placement = mockup.placement
-                    const url = mockup.url
-                    
-                    if (!productMockups[variantId]) {
-                      productMockups[variantId] = {}
-                    }
-                    productMockups[variantId][placement] = { url: url }
-                  })
-                  
-                  // Update the design data with the real mockup
-                  const updatedProducts = existingProducts.map((p: any) => 
-                    p.id === product.id 
-                      ? { 
-                          ...p, 
-                          variantMockups: {
-                            ...(p.variantMockups || {}),
-                            ...productMockups
-                          }
-                        }
-                      : p
-                  )
-                  
-                  const updatedDesignData = {
-                    ...existingDesignData,
-                    products: updatedProducts
-                  }
-                  
-                  await supabase
-                    .from('qr_designs')
-                    .update({ design_data: updatedDesignData })
-                    .eq('qr_code', qr.code)
-                  
-                  console.log(`✅ Real mockup generated for product ${product.productId}, variant ${product.variantId}`)
-                  break
-                }
-                
-                if (statusData.status === 'failed') {
-                  console.error(`❌ Mockup generation failed for product ${product.productId}:`, statusData.error)
-                  break
-                }
-              }
-            } else {
-              console.error(`❌ Failed to request mockup for product ${product.productId}`)
-            }
-          } catch (error) {
-            console.error(`❌ Error generating mockup for product ${product.productId}:`, error)
-          }
-        }
-      } catch (error) {
-        console.error(`❌ Error processing QR ${qr.code}:`, error)
-      }
-    }
-    
-    console.log('✅ Background mockup generation completed for all QRs')
-  } catch (error) {
-    console.error('❌ Error in background mockup generation:', error)
-    if (error instanceof Error) {
-      console.error('❌ Error stack:', error.stack)
-    }
-  }
-}

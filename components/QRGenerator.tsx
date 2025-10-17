@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -27,7 +27,7 @@ import { QRProductsList } from './QRProductsList'
 import { ViewMultiProductDesignModal } from './ViewMultiProductDesignModal'
 import { Modal, ModalFooter } from './ui/Modal'
 import { migrateLegacyDesign, QRProduct } from '@/types/qr-product'
-
+import type { MockupResult } from '@/lib/mockup-generation'
 interface QRRow {
   id: string
   code: string
@@ -198,7 +198,7 @@ function buildDesignStateEntry(designData: any, url?: string) {
 
 const FALLBACK_DESTINATION = 'https://elquelo.com/despedida'
 
-// Función para normalizar designData y evitar crashes
+// FunciÃ³n para normalizar designData y evitar crashes
 function normalizeDesignData(designData: any): any {
   if (!designData || typeof designData !== 'object') {
     return designData
@@ -234,7 +234,7 @@ function normalizeDesignData(designData: any): any {
     })
   }
 
-  // Normalizar también el formato legacy si existe
+  // Normalizar tambiÃ©n el formato legacy si existe
   if (normalized.designsByPlacement) {
     normalized.designsByPlacement = Object.fromEntries(
       Object.entries(normalized.designsByPlacement).map(([key, value]: [string, any]) => {
@@ -287,6 +287,12 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const [editingProductId, setEditingProductId] = useState<string | null>(null) // Nuevo: ID del producto siendo editado
   const [productPickerOpen, setProductPickerOpen] = useState(false)
   const [pendingProductId, setPendingProductId] = useState<string | null>(null)
+
+  const [mockupPromptOpen, setMockupPromptOpen] = useState(false)
+  const [mockupCandidates, setMockupCandidates] = useState<QRRow[]>([])
+  const [mockupLoading, setMockupLoading] = useState(false)
+  const [mockupResults, setMockupResults] = useState<MockupResult[] | null>(null)
+
   const [viewDesignOpen, setViewDesignOpen] = useState(false)
   const [viewingDesign, setViewingDesign] = useState<{ code: string; designData: any } | null>(null)
   const [copyDesignOpen, setCopyDesignOpen] = useState(false)
@@ -429,7 +435,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             if (response.ok) {
               const data = await response.json()
               
-              // CRÍTICO: Normalizar designData antes de usar
+              // CRÃTICO: Normalizar designData antes de usar
               const normalizedDesignData = data.designData ? normalizeDesignData(data.designData) : data.designData
               
               const entry = buildDesignStateEntry(normalizedDesignData, data.url)
@@ -488,10 +494,20 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Error al crear el QR')
       }
-      const newQr = data.qr as QRRow
-      setQrs((prev) => [newQr, ...prev])
+      const newQr = (data.qr as QRRow) || null
+
+      if (newQr) {
+
+        setQrs((prev) => [newQr, ...prev])
+
+        openMockupPrompt([newQr])
+
+      }
+
       toast.success('QR creado')
+
       setShowForm(false)
+
       setFormData({ title: '' })
     } catch (error) {
       console.error(error)
@@ -546,6 +562,64 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       toast.error('No se pudieron crear los QRs del grupo')
     } finally {
       setCreating(false)
+    }
+  }
+
+    const openMockupPrompt = (created: QRRow[]) => {
+    if (!created.length) {
+      return
+    }
+    setMockupCandidates(created)
+    setMockupResults(null)
+    setMockupPromptOpen(true)
+  }
+
+  const closeMockupPrompt = () => {
+    if (mockupLoading) {
+      return
+    }
+    setMockupPromptOpen(false)
+    setMockupCandidates([])
+    setMockupResults(null)
+  }
+
+  const handleGenerateMockupsForCreated = async () => {
+    if (!mockupCandidates.length) {
+      return
+    }
+
+    setMockupLoading(true)
+    setMockupResults(null)
+
+    try {
+      const response = await fetch('/api/mockups/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrCodes: mockupCandidates.map((qr) => qr.code) }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudieron generar los mockups')
+      }
+
+      const results: MockupResult[] = Array.isArray(data.results) ? data.results : []
+      setMockupResults(results)
+
+      if (data.success) {
+        toast.success('Mockups generados correctamente')
+        setQrs((prev) => [...prev])
+      } else if (results.length > 0) {
+        toast.error('La generación se completó con algunos errores')
+      } else {
+        toast.error('No se generaron mockups')
+      }
+    } catch (error: any) {
+      console.error('Error generating mockups:', error)
+      toast.error(error?.message || 'Error generando mockups')
+    } finally {
+      setMockupLoading(false)
     }
   }
 
@@ -660,8 +734,8 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     if (editingQR) {
       await uploadDesignToServer(editingQR.code, designData)
     }
-    // NO cerrar el modal aquí - el editor lo cierra automáticamente después de guardar
-    // Esto evita cierres prematuros durante la generación de mockups
+    // NO cerrar el modal aquÃ­ - el editor lo cierra automÃ¡ticamente despuÃ©s de guardar
+    // Esto evita cierres prematuros durante la generaciÃ³n de mockups
   }
 
   const handleStartAddProduct = () => {
@@ -738,12 +812,12 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     setPendingProductId(null)
   }
 
-  // Nuevo: Abrir editor individual para un producto específico
+  // Nuevo: Abrir editor individual para un producto especÃ­fico
   const handleOpenSingleProductEditor = (productId: string) => {
     setPendingProductId(productId)
     setProductPickerOpen(false)
     setEditingProductId(productId)
-    // El dashboard se cierra automáticamente (editorOpen sigue true)
+    // El dashboard se cierra automÃ¡ticamente (editorOpen sigue true)
   }
 
   // Nuevo: Volver del editor individual al dashboard
@@ -751,10 +825,10 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     setEditingProductId(null)
     setPendingProductId(null)
     setProductPickerOpen(false)
-    // El dashboard se muestra automáticamente
+    // El dashboard se muestra automÃ¡ticamente
   }
 
-  // Nuevo: Guardar producto individual y actualizar el diseño
+  // Nuevo: Guardar producto individual y actualizar el diseÃ±o
   const handleSaveProductDesign = async (designData: any) => {
     if (!editingQR || !editingProductId) return
 
@@ -813,7 +887,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       updatedProducts.push(updatedProduct)
     }
 
-    // Guardar el diseño completo
+    // Guardar el diseÃ±o completo
     const finalDesignData = {
       ...migratedDesign,
       products: updatedProducts,
@@ -854,7 +928,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     const sourceMigrated = migrateLegacyDesign(sourceDesign.designData)
     const sourceProducts = sourceMigrated.products || []
 
-    // Validar que no se copien diseños entre tipos de productos incompatibles
+    // Validar que no se copien diseÃ±os entre tipos de productos incompatibles
     for (const targetCode of selectedTargetQRs) {
       const targetDesign = designs[targetCode]?.designData
       if (targetDesign) {
@@ -866,11 +940,11 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
           const sourceProductIds = new Set(sourceProducts.map(p => p.productId))
           const targetProductIds = new Set(targetProducts.map(p => p.productId))
           
-          // Verificar que haya al menos un producto en común
+          // Verificar que haya al menos un producto en comÃºn
           const hasCommonProducts = Array.from(sourceProductIds).some(id => targetProductIds.has(id))
           
           if (!hasCommonProducts && targetProducts.length > 0) {
-            toast.error(`El QR ${targetCode} tiene productos de tipo diferente. No se puede copiar el diseño de camisetas a tazas, etc.`)
+            toast.error(`El QR ${targetCode} tiene productos de tipo diferente. No se puede copiar el diseÃ±o de camisetas a tazas, etc.`)
           setCopyingDesign(false)
           return
           }
@@ -886,7 +960,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       )
 
       const copyPromises = targetQRs.map(async (targetQR) => {
-        // Obtener el diseño actual del QR destino
+        // Obtener el diseÃ±o actual del QR destino
         const targetResponse = await fetch(`/api/design/${targetQR.code}`)
         const targetDesignData = targetResponse.ok ? (await targetResponse.json()).designData : null
         
@@ -918,7 +992,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
               }
             })
           }
-          // Si el destino NO tiene productos, se copian tal cual del origen (ya están en clonedDesign)
+          // Si el destino NO tiene productos, se copian tal cual del origen (ya estÃ¡n en clonedDesign)
         }
         
         // Regenerar archivos de QR para el nuevo QR
@@ -959,7 +1033,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
 
   const regenerateQRFiles = async (clonedDesign: any, sourceQRCode: string, targetQRCode: string, availableQRs: QRRow[]) => {
     try {
-      // Buscar archivos de QR en el diseño clonado
+      // Buscar archivos de QR en el diseÃ±o clonado
       const placements = clonedDesign.designsByPlacement || clonedDesign.printful?.placements || {}
       
       for (const [placement, value] of Object.entries(placements)) {
@@ -1004,14 +1078,14 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             continue
           }
           
-          // Actualizar la URL en el diseño clonado
+          // Actualizar la URL en el diseÃ±o clonado
           if (typeof value === 'string') {
             clonedDesign.designsByPlacement[placement] = uploadData.url
           } else if (value && typeof value === 'object') {
             (value as any).imageUrl = uploadData.url
           }
           
-          // CRÍTICO: También actualizar en printful.placements si existe
+          // CRÃTICO: TambiÃ©n actualizar en printful.placements si existe
           if (clonedDesign.printful?.placements?.[placement]) {
             clonedDesign.printful.placements[placement].imageUrl = uploadData.url
           }
@@ -1026,9 +1100,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   }
 
   const uploadDesignToServer = async (code: string, designData: any) => {
-    console.log('📤 [QRGenerator] uploadDesignToServer iniciado')
-    console.log('📤 [QRGenerator] Code:', code)
-    console.log('📤 [QRGenerator] DesignData:', JSON.stringify(designData, null, 2))
+    console.log('ðŸ“¤ [QRGenerator] uploadDesignToServer iniciado')
+    console.log('ðŸ“¤ [QRGenerator] Code:', code)
+    console.log('ðŸ“¤ [QRGenerator] DesignData:', JSON.stringify(designData, null, 2))
     
     setDesigns((prev) => ({
       ...prev,
@@ -1043,7 +1117,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         code,
         designData
       }
-      console.log('📤 [QRGenerator] Payload a enviar:', JSON.stringify(payload, null, 2))
+      console.log('ðŸ“¤ [QRGenerator] Payload a enviar:', JSON.stringify(payload, null, 2))
       
       const uploadResponse = await fetch('/api/design/save', {
         method: 'POST',
@@ -1078,7 +1152,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         }
       })
       
-      // Notificar cambio de diseño para actualizar precios
+      // Notificar cambio de diseÃ±o para actualizar precios
       onDesignChanged?.()
     } catch (error) {
       console.error('Error uploading design:', error)
@@ -1439,7 +1513,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                           className="inline-flex items-center gap-2 rounded-full border border-gray-200/60 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600"
                         >
                           <UploadCloud className="h-4 w-4" />
-                          {designState?.loading ? 'Preparando editor...' : 'Editar diseño'}
+                          {designState?.loading ? 'Preparando editor...' : 'Editar diseÃ±o'}
                         </button>
                       </div>
                       <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200/40 bg-white">
@@ -1454,7 +1528,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                             <QRProductsList 
                               designData={designState.designData}
                               onAddProduct={() => {
-                                // Crear ID temporal para el nuevo producto y abrir directamente el catálogo
+                                // Crear ID temporal para el nuevo producto y abrir directamente el catÃ¡logo
                                 const newProductId = crypto.randomUUID ? crypto.randomUUID() : `product-${Date.now()}`
                                 setEditingQR(qr)
                                 setEditorOpen(true)
@@ -1493,7 +1567,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                                     </div>
                                   )}
                                   <div>
-                                    <p className="font-semibold text-gray-900">Diseño guardado</p>
+                                    <p className="font-semibold text-gray-900">DiseÃ±o guardado</p>
                                     <p className="text-xs text-gray-500">
                                       Variante {designState.printfulSummary?.variantId ?? 'N/A'} -{' '}
                                       {designState.printfulSummary?.size ?? 'Sin talla'} -{' '}
@@ -1544,7 +1618,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                                 onClick={() => uploadDesign(qr.code)}
                                 className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-primary-200 hover:text-primary-600"
                               >
-                                <UploadCloud className="h-3.5 w-3.5" /> Editar diseño
+                                <UploadCloud className="h-3.5 w-3.5" /> Editar diseÃ±o
                               </button>
                             </div>
                           </div>
@@ -1562,7 +1636,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                           </div>
                         ) : (
                           <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                            No hay diseño todavía. Genera un mockup.
+                            No hay diseÃ±o todavÃ­a. Genera un mockup.
                           </div>
                         )}
                       </div>
@@ -1575,7 +1649,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         </div>
       )}
       
-      {/* Editor de Diseño Multi-Producto - Dashboard de Productos */}
+      {/* Editor de DiseÃ±o Multi-Producto - Dashboard de Productos */}
       {editorOpen && editingQR && !editingProductId && (
         <MultiProductDesignEditor
           qrCode={editingQR.code}
@@ -1641,7 +1715,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
             onSave={handleSaveProductDesign}
             onBack={handleBackToDashboard}
             onCancel={() => {
-              // Si era un producto nuevo y se cancela, no hacer nada (no se añade a la lista)
+              // Si era un producto nuevo y se cancela, no hacer nada (no se aÃ±ade a la lista)
               setEditorOpen(false)
               setEditingQR(null)
               setEditingProductId(null)
@@ -1652,7 +1726,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
         )
       })()}
 
-      {/* Modal para ver diseño multi-producto */}
+      {/* Modal para ver diseÃ±o multi-producto */}
       {viewDesignOpen && viewingDesign && (
         <ViewMultiProductDesignModal
           qrCode={viewingDesign.code}
@@ -1679,13 +1753,13 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                   setSourceDesign(null)
                   setSelectedTargetQRs([])
                 }}
-          title={`Copiar diseño - ${sourceDesign.code}`}
+          title={`Copiar diseÃ±o - ${sourceDesign.code}`}
           size="2xl"
               >
               <div className="space-y-4">
                 {/* Informacion del diseno origen */}
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Diseño origen</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">DiseÃ±o origen</h4>
                   <div className="text-sm text-blue-700">
                     <div>QR: {sourceDesign.code}</div>
                     <div>Productos: {(() => {
@@ -1708,7 +1782,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                         .filter(qr => {
                           const targetDesign = designs[qr.code]?.designData
                           
-                          // CASO 1: QR sin diseño (siempre compatible)
+                          // CASO 1: QR sin diseÃ±o (siempre compatible)
                           if (!targetDesign) {
                             return true
                           }
@@ -1716,7 +1790,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                           const targetMigrated = migrateLegacyDesign(targetDesign)
                           const targetProducts = targetMigrated.products || []
                           
-                          // CASO 2: QR con diseño vacío (siempre compatible)
+                          // CASO 2: QR con diseÃ±o vacÃ­o (siempre compatible)
                           if (targetProducts.length === 0) {
                             return true
                           }
@@ -1732,7 +1806,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                       if (compatibleQRs.length === 0) {
                         return (
                           <div className="bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800">
-                            No hay QRs compatibles. Puedes copiar diseños a QRs vacíos o que tengan productos compatibles (mismo tipo de producto).
+                            No hay QRs compatibles. Puedes copiar diseÃ±os a QRs vacÃ­os o que tengan productos compatibles (mismo tipo de producto).
                           </div>
                         )
                       }
@@ -1760,7 +1834,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                             </div>
                             {designs[qr.code]?.hasDesign && (
                               <div className="text-xs text-orange-600 mt-1">
-                                ⚠️ Ya tiene diseño - se sobrescribirá
+                                âš ï¸ Ya tiene diseÃ±o - se sobrescribirÃ¡
                               </div>
                             )}
                           </div>
@@ -1834,8 +1908,8 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
               return trashedProducts.length === 0 ? (
                 <div className="text-center py-12">
                   <Trash2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">La papelera está vacía</h3>
-                  <p className="text-gray-600">Los productos eliminados aparecerán aquí</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">La papelera estÃ¡ vacÃ­a</h3>
+                  <p className="text-gray-600">Los productos eliminados aparecerÃ¡n aquÃ­</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1882,7 +1956,7 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
                         </button>
                         <button
                           onClick={async () => {
-                            if (confirm('¿Eliminar permanentemente este producto? Esta acción no se puede deshacer.')) {
+                            if (confirm('Â¿Eliminar permanentemente este producto? Esta acciÃ³n no se puede deshacer.')) {
                               // Eliminar permanentemente
                               const updatedProducts = currentDesign.products.filter((p: any) => p.id !== product.id)
                               const updatedDesign = { ...currentDesign, products: updatedProducts }
@@ -1912,4 +1986,13 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
 
