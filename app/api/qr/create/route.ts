@@ -334,7 +334,7 @@ export async function POST(req: NextRequest) {
             console.log(`✅ Template QR uploaded:`, templateQrPublicUrl)
             
             // Generate mockups for all selected package products
-            const MOCKUP_BLACKLIST = [92, 19] // Gorra y Taza - problemas con mockups automáticos
+            const MOCKUP_BLACKLIST = [92] // Solo Gorra - problemas con embroidery
             const mockupPromises = packagesToProcess.map(async (pkg) => {
               return Promise.all(pkg.products.map(async (product) => {
                 // Skip productos sin ID válido
