@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
         }
         
         // Start background mockup generation (don't await)
-        generateMockupsInBackground(data, members, selectedPackages).catch(error => {
+        generateMockupsInBackground(data, members, selectedPackages, cookies()).catch(error => {
           console.error('❌ Background mockup generation failed:', error)
         })
         
@@ -254,12 +254,12 @@ export async function POST(req: NextRequest) {
 }
 
 // Background function to generate mockups
-async function generateMockupsInBackground(data: any[], members: any[], selectedPackages: string[]) {
+async function generateMockupsInBackground(data: any[], members: any[], selectedPackages: string[], cookies: any) {
   try {
     console.log('🎨 Starting background mockup generation for', data.length, 'QRs')
     
     // Create Supabase client for background processing
-    const supabase = createRouteHandlerClient({ cookies: () => new Map() })
+    const supabase = createRouteHandlerClient({ cookies: () => cookies })
     
     // Get packages to process
     const packagesToProcess = getAllPackages().filter(pkg => selectedPackages.includes(pkg.id))
