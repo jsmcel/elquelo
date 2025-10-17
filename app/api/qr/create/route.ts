@@ -152,6 +152,13 @@ export async function POST(req: NextRequest) {
               return
             }
             
+            // Skip regular packages if participant is novio/novia and this is not a novio/novia package
+            // (This ensures novios/novias only get their special packages, not regular ones)
+            if (!isNovioNoviaPackage && isParticipantNovioNovia) {
+              console.log(`⏭️  Skipping regular package ${pkg.id} for novio/novia ${participant?.name}`)
+              return
+            }
+            
             console.log(`✅ Adding package ${pkg.id} for participant ${participant?.name} (novio/novia: ${isParticipantNovioNovia})`)
             
             pkg.products.forEach(product => {
@@ -382,7 +389,7 @@ async function generateMockupsInBackground(data: any[], members: any[], selected
                   })
                   
                   // Update the design data with the real mockup
-                  const updatedProducts = existingProducts.map(p => 
+                  const updatedProducts = existingProducts.map((p: any) => 
                     p.id === product.id 
                       ? { 
                           ...p, 
