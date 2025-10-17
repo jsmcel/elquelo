@@ -320,7 +320,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
       toast.error('Este producto no tiene variantes disponibles en este momento')
     }
   }
-}
 
   const handleConfirmSelection = (optionOverride?: ProductOption, variantOverrideId?: number) => {
     const optionToUse = optionOverride ?? activeOption
