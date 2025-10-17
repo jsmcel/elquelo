@@ -229,6 +229,7 @@ export async function POST(req: NextRequest) {
         }
         
         // Start background mockup generation (don't await)
+        console.log('🚀 Starting background mockup generation...')
         generateMockupsInBackground(data, members, selectedPackages, cookies()).catch(error => {
           console.error('❌ Background mockup generation failed:', error)
         })
@@ -257,6 +258,8 @@ export async function POST(req: NextRequest) {
 async function generateMockupsInBackground(data: any[], members: any[], selectedPackages: string[], cookies: any) {
   try {
     console.log('🎨 Starting background mockup generation for', data.length, 'QRs')
+    console.log('🎨 Selected packages:', selectedPackages)
+    console.log('🎨 Members:', members.length)
     
     // Create Supabase client for background processing
     const supabase = createRouteHandlerClient({ cookies: () => cookies })
@@ -271,7 +274,7 @@ async function generateMockupsInBackground(data: any[], members: any[], selected
         
         // Generate QR image for this specific QR
         const { generateStandardQR } = await import('@/lib/qr-generator')
-        const qrUrl = `${process.env.QR_DOMAIN}/${qr.code}`
+        const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/qr/${qr.code}`
         const qrDataUrl = await generateStandardQR(qrUrl)
         
         // Convert data URL to Buffer
