@@ -231,6 +231,7 @@ export async function POST(req: NextRequest) {
         
         const pendingMockupCodes = data.map((item) => item?.code).filter(Boolean) as string[]
 
+        // Opción 1: inline (bloqueante) si está activado por entorno
         if (
           pendingMockupCodes.length &&
           process.env.MOCKUP_AUTOGENERATE_MODE === 'inline' &&
@@ -244,6 +245,22 @@ export async function POST(req: NextRequest) {
             })
           } catch (error) {
             console.error('Inline mockup generation failed:', error)
+          }
+        } else if (pendingMockupCodes.length && process.env.NEXT_PUBLIC_APP_URL) {
+          // Opción 2: desencadenar en background (no bloqueante) siempre que haya códigos
+          // Pasamos las cookies del request para mantener el contexto de usuario
+          try {
+            // No esperamos a que termine; solo disparamos la tarea
+            fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/mockups/generate`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Cookie: req.headers.get('cookie') || '',
+              },
+              body: JSON.stringify({ qrCodes: pendingMockupCodes }),
+            }).catch((err) => console.error('Failed to trigger background mockup generation:', err))
+          } catch (err) {
+            console.error('Error scheduling background mockup generation:', err)
           }
         }
 

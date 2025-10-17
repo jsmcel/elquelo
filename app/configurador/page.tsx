@@ -198,6 +198,8 @@ export default function ConfiguratorPage() {
 
       toast.success('¡Grupo creado exitosamente! Ahora puedes diseñar las camisetas.')
       
+      // Mockups se disparan en background desde el servidor
+      toast('Generando mockups en segundo plano para todos los productos (20–60s)')
       // Redirect to dashboard
       setTimeout(() => {
         router.push('/dashboard')

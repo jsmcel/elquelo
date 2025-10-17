@@ -497,11 +497,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       const newQr = (data.qr as QRRow) || null
 
       if (newQr) {
-
         setQrs((prev) => [newQr, ...prev])
-
-        openMockupPrompt([newQr])
-
+        // Mockups se disparan en background desde el servidor
+        toast('Generando mockups en segundo plano para este QR (20–60s)')
       }
 
       toast.success('QR creado')
@@ -552,6 +550,10 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       const created = (data.qrs || []) as QRRow[]
       setQrs((prev) => [...created, ...prev])
       toast.success(`Se generaron ${created.length} QRs`)
+      if (created.length > 0) {
+        // Mockups se disparan en background desde el servidor
+        toast(`Generando mockups en segundo plano para ${created.length} QRs (20–60s)`) 
+      }
       setShowForm(false)
       setBulkForm({
         names: '',
