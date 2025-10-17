@@ -125,6 +125,15 @@ export default function ConfiguratorPage() {
         throw new Error(data.error || 'No pudimos generar los QRs')
       }
 
+      // Guardar QRs pendientes para seguimiento de mockups en Dashboard
+      try {
+        const pending = Array.isArray(data.pendingMockupCodes) ? data.pendingMockupCodes : []
+        if (pending.length) {
+          sessionStorage.setItem('elquelo_pending_mockups', JSON.stringify(pending))
+          sessionStorage.setItem('elquelo_pending_mockups_startedAt', String(Date.now()))
+        }
+      } catch {}
+
       toast.success('¡Grupo creado exitosamente! Ahora puedes diseñar las camisetas.')
       
       // Mockups se disparan en background desde el servidor

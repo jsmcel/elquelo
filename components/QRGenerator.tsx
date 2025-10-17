@@ -302,6 +302,105 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
   const [productTrashOpen, setProductTrashOpen] = useState(false)
   const [trashQRCode, setTrashQRCode] = useState<string | null>(null)
   const [priceRefreshKey, setPriceRefreshKey] = useState(0)
+  const mockupProgressRef = useRef<{ interval: any | null; active: boolean }>({ interval: null, active: false })
+
+  const savePendingMockupCodes = (codes: string[]) => {
+    const key = 'elquelo_pending_mockups'
+    try {
+      const prev = JSON.parse(sessionStorage.getItem(key) || '[]') as string[]
+      const set = new Set([...(Array.isArray(prev) ? prev : []), ...codes])
+      const list = Array.from(set)
+      sessionStorage.setItem(key, JSON.stringify(list))
+      sessionStorage.setItem(`${key}_startedAt`, String(Date.now()))
+      return list
+    } catch {
+      sessionStorage.setItem(key, JSON.stringify(codes))
+      sessionStorage.setItem(`${key}_startedAt`, String(Date.now()))
+      return codes
+    }
+  }
+
+  const loadPendingMockupCodes = (): string[] => {
+    const key = 'elquelo_pending_mockups'
+    try {
+      const startedAt = Number(sessionStorage.getItem(`${key}_startedAt`) || '0')
+      // TTL 10 minutos
+      if (startedAt && Date.now() - startedAt > 10 * 60 * 1000) {
+        sessionStorage.removeItem(key)
+        sessionStorage.removeItem(`${key}_startedAt`)
+        return []
+      }
+      const arr = JSON.parse(sessionStorage.getItem(key) || '[]')
+      return Array.isArray(arr) ? (arr as string[]) : []
+    } catch {
+      return []
+    }
+  }
+
+  const clearPendingMockupCodes = () => {
+    const key = 'elquelo_pending_mockups'
+    sessionStorage.removeItem(key)
+    sessionStorage.removeItem(`${key}_startedAt`)
+  }
+
+  const trackMockupProgress = (codes: string[]) => {
+    if (!codes.length) return
+    if (mockupProgressRef.current.active) return
+    mockupProgressRef.current.active = true
+
+    const toastId = 'mockup-progress'
+    let started = Date.now()
+    toast.loading(`Generando mockups… 0%`, { id: toastId })
+
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/mockups/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrCodes: codes }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data?.success) {
+          return
+        }
+        const entries = Array.isArray(data.entries) ? data.entries : []
+        if (!entries.length) return
+
+        const totals = entries.reduce(
+          (acc: { total: number; done: number }, e: any) => {
+            acc.total += Number(e.totalProducts || 0)
+            acc.done += Number(e.completedProducts || 0)
+            return acc
+          },
+          { total: 0, done: 0 }
+        )
+        const percent = totals.total > 0 ? Math.round((totals.done / totals.total) * 100) : 0
+        toast.loading(`Generando mockups… ${percent}%`, { id: toastId })
+
+        const allFinished = Boolean(data.allFinished)
+        const expired = Date.now() - started > 5 * 60 * 1000 // 5 min
+        if (allFinished || expired) {
+          if (allFinished) {
+            toast.success('Mockups listos', { id: toastId })
+          } else {
+            toast('Mockups en proceso (continuarán en segundo plano)')
+          }
+          if (mockupProgressRef.current.interval) {
+            clearInterval(mockupProgressRef.current.interval)
+          }
+          mockupProgressRef.current.interval = null
+          mockupProgressRef.current.active = false
+          if (allFinished) clearPendingMockupCodes()
+        }
+      } catch {
+        // Ignorar errores intermitentes
+      }
+    }
+
+    mockupProgressRef.current.interval = setInterval(poll, 2500)
+    // Primera llamada rápida
+    poll()
+  }
 
   useEffect(() => {
     if (!user) {
@@ -499,7 +598,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       if (newQr) {
         setQrs((prev) => [newQr, ...prev])
         // Mockups se disparan en background desde el servidor
-        toast('Generando mockups en segundo plano para este QR (20–60s)')
+        toast('Generando mockups en segundo plano para este QR (20-60s)')
+        const list = savePendingMockupCodes([newQr.code])
+        trackMockupProgress(list)
       }
 
       toast.success('QR creado')
@@ -552,7 +653,9 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       toast.success(`Se generaron ${created.length} QRs`)
       if (created.length > 0) {
         // Mockups se disparan en background desde el servidor
-        toast(`Generando mockups en segundo plano para ${created.length} QRs (20–60s)`) 
+        toast(`Generando mockups en segundo plano para ${created.length} QRs (20-60s)`) 
+        const list = savePendingMockupCodes(created.map((c) => c.code))
+        trackMockupProgress(list)
       }
       setShowForm(false)
       setBulkForm({
@@ -566,6 +669,21 @@ export function QRGenerator({ onDesignChanged }: QRGeneratorProps = {}) {
       setCreating(false)
     }
   }
+
+  // Reanudar seguimiento si venimos de un redirect (configuradores)
+  useEffect(() => {
+    const pending = loadPendingMockupCodes()
+    if (pending.length) {
+      trackMockupProgress(pending)
+    }
+    return () => {
+      if (mockupProgressRef.current.interval) {
+        clearInterval(mockupProgressRef.current.interval)
+        mockupProgressRef.current.interval = null
+        mockupProgressRef.current.active = false
+      }
+    }
+  }, [])
 
     const openMockupPrompt = (created: QRRow[]) => {
     if (!created.length) {

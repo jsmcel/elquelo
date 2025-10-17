@@ -198,6 +198,14 @@ export default function ConfiguratorPage() {
 
       toast.success('¡Grupo creado exitosamente! Ahora puedes diseñar las camisetas.')
       
+      // Guardar QRs pendientes para seguimiento de mockups en Dashboard
+      try {
+        const pending = Array.isArray(data.pendingMockupCodes) ? data.pendingMockupCodes : []
+        if (pending.length) {
+          sessionStorage.setItem('elquelo_pending_mockups', JSON.stringify(pending))
+          sessionStorage.setItem('elquelo_pending_mockups_startedAt', String(Date.now()))
+        }
+      } catch {}
       // Mockups se disparan en background desde el servidor
       toast('Generando mockups en segundo plano para todos los productos (20–60s)')
       // Redirect to dashboard
