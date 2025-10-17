@@ -324,24 +324,27 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
     handleConfirmSelection(option, firstVariant.id)
   }
 
-  const handleConfirmSelection = () => {
-    if (!activeOption || selectedVariantId === null) {
+  const handleConfirmSelection = (optionOverride?: ProductOption, variantIdOverride?: number) => {
+    const option = optionOverride ?? activeOption
+    const variantId = variantIdOverride ?? selectedVariantId
+
+    if (!option || variantId === null) {
       return
     }
 
-    const variant = activeOption.variants.find((item) => item.id === selectedVariantId)
+    const variant = option.variants.find((item) => item.id === variantId)
     if (!variant) {
       return
     }
 
     onSelect({
-      productId: Number(activeOption.id),
-      templateId: activeOption.templateId,
+      productId: Number(option.id),
+      templateId: option.templateId,
       defaultVariantId: variant.id,
       defaultSize: variant.size || undefined,
       defaultColor: variant.color || undefined,
       defaultColorCode: variant.colorCode || undefined,
-      name: activeOption.name,
+      name: option.name,
     })
   }
 
