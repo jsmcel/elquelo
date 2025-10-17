@@ -79,6 +79,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Asynchronously trigger mockup generation for the specific QR code
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/mockups/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': request.headers.get('cookie') || '',
+      },
+      body: JSON.stringify({ qrCodes: [code] }),
+    }).catch(err => console.error('Failed to trigger mockup generation:', err));
+
     return NextResponse.json({
       success: true,
       message: 'Diseño guardado correctamente',
