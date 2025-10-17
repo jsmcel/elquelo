@@ -152,12 +152,8 @@ export async function POST(req: NextRequest) {
               return
             }
             
-            // Skip regular packages if participant is novio/novia and this is not a novio/novia package
-            // (This ensures novios/novias only get their special packages, not regular ones)
-            if (!isNovioNoviaPackage && isParticipantNovioNovia) {
-              console.log(`⏭️  Skipping regular package ${pkg.id} for novio/novia ${participant?.name}`)
-              return
-            }
+            // Novios/novias get ALL packages (both regular and exclusive)
+            // Only skip if package is exclusive to novio/novia but participant is not novio/novia
             
             console.log(`✅ Adding package ${pkg.id} for participant ${participant?.name} (novio/novia: ${isParticipantNovioNovia})`)
             
