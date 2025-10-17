@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import { Modal, ModalFooter } from './ui/Modal'
 
 export interface ProductSelectionResult {
@@ -89,11 +90,7 @@ const REGION_LABELS: Record<string, string> = {
   MX: 'Mexico',
 }
 
-const PRICE_SEPARATOR = ' | '
-
-const USD_FORMATTER = typeof Intl !== 'undefined'
-  ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
-  : null
+const PRICE_SEPARATOR = ' · '
 
 function resolveCategory(product: CatalogProduct): ProductCategory {
   const haystack = [product.type, product.name, product.brand].filter(Boolean).join(' ').toLowerCase()
@@ -114,35 +111,6 @@ function resolveCategory(product: CatalogProduct): ProductCategory {
   }
 
   return 'otros'
-}
-
-function formatPrice(value: number | null): string | null {
-  if (value === null || Number.isNaN(value)) {
-    return null
-  }
-  if (USD_FORMATTER) {
-    return USD_FORMATTER.format(value)
-  }
-  return `USD ${value.toFixed(2)}`
-}
-
-function formatPriceRange(min: number | null, max: number | null): string {
-  const formattedMin = formatPrice(min)
-  const formattedMax = formatPrice(max)
-
-  if (formattedMin && formattedMax) {
-    if (Math.abs(Number(min) - Number(max)) < 0.01) {
-      return formattedMin
-    }
-    return `${formattedMin} - ${formattedMax}`
-  }
-  if (formattedMin) {
-    return `Desde ${formattedMin}`
-  }
-  if (formattedMax) {
-    return `Hasta ${formattedMax}`
-  }
-  return 'Precio no disponible'
 }
 
 function normalizeVariants(raw: CatalogProduct['variants']): CatalogVariant[] {
@@ -197,10 +165,7 @@ function getVariantLabel(variant: CatalogVariant): string {
   const parts: string[] = []
   if (variant.color) parts.push(variant.color)
   if (variant.size) parts.push(variant.size)
-  if (!parts.length) parts.push('Variante estandar')
-
-  const price = formatPrice(variant.price)
-  if (price) parts.push(price)
+  if (!parts.length) parts.push('Variante disponible')
 
   if (variant.matchedRegion) {
     const label = REGION_LABELS[variant.matchedRegion] || variant.matchedRegion
@@ -342,6 +307,21 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
 
   const handleChooseProduct = (optionId: number) => {
     setActiveOptionId(optionId)
+    const option = options.find((item) => item.id === optionId)
+    setSelectedVariantId(option?.variants[0]?.id ?? null)
+  }
+
+  const handleDirectSelect = (option: ProductOption) => {
+    const firstVariant = option.variants[0]
+
+    if (!firstVariant) {
+      toast.error('Este producto no tiene variantes disponibles en este momento')
+      return
+    }
+
+    setActiveOptionId(option.id)
+    setSelectedVariantId(firstVariant.id)
+    handleConfirmSelection(option, firstVariant.id)
   }
 
   const handleConfirmSelection = () => {
@@ -426,12 +406,12 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {items.map((option) => {
                       const isActive = activeOption?.id === option.id
-                      const priceRange = formatPriceRange(option.priceMin, option.priceMax)
                       return (
                         <button
                           key={option.id}
                           type="button"
                           onClick={() => handleChooseProduct(option.id)}
+                          onDoubleClick={() => handleDirectSelect(option)}
                           className={`flex w-full flex-col items-stretch gap-3 rounded-xl border p-4 text-left transition ${
                             isActive ? 'border-orange-400 bg-orange-50 shadow-md' : 'border-gray-200 bg-white hover:border-orange-300 hover:shadow'
                           }`}
@@ -450,11 +430,10 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
                             </div>
                             <div className="flex-1">
                               <h4 className="text-sm font-semibold text-gray-900">{option.name}</h4>
-                              <div className="mt-1 text-xs text-gray-500">
-                                {option.brand && <span>{option.brand}{PRICE_SEPARATOR}</span>}
-                                {option.type && <span>{option.type.toLowerCase()}</span>}
+                              <div className="mt-1 text-xs text-gray-500 space-x-1">
+                                {option.brand && <span>{option.brand}</span>}
+                                {option.type && <span className="text-gray-400">{PRICE_SEPARATOR}{option.type.toLowerCase()}</span>}
                               </div>
-                              <div className="mt-2 text-sm font-medium text-orange-700">{priceRange}</div>
                               <div className="mt-1 text-xs text-gray-500">
                                 {option.variantCount} variantes | {option.placements.join(', ') || 'Sin placements definidos'}
                               </div>
@@ -477,9 +456,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
             <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div>
                 <div className="text-sm font-semibold text-gray-900">{activeOption.name}</div>
-                <div className="text-xs text-gray-500">
-                  {activeOption.brand && `${activeOption.brand}${PRICE_SEPARATOR}`}
-                  {formatPriceRange(activeOption.priceMin, activeOption.priceMax)}
+                <div className="text-xs text-gray-500 space-x-1">
+                  {activeOption.brand && <span>{activeOption.brand}</span>}
+                  {activeOption.type && <span className="text-gray-400">{PRICE_SEPARATOR}{activeOption.type.toLowerCase()}</span>}
                 </div>
               </div>
               <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -511,7 +490,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
             </button>
             <button
               type="button"
-              onClick={handleConfirmSelection}
+              onClick={() => handleConfirmSelection()}
               disabled={!activeOption || selectedVariantId === null}
               className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 md:w-auto"
             >
