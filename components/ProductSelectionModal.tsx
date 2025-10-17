@@ -307,7 +307,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect }: ProductSele
 
   const handleChooseProduct = (optionId: number) => {
     setActiveOptionId(optionId)
-  
+  }
 
   const handleDirectSelect = (option: ProductOption) => {
     const firstVariant = option.variants[0]
