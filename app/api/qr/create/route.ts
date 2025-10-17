@@ -21,6 +21,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Función para manejar retry en caso de rate limiting
+async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await fetch(url, options)
+    
+    if (response.status === 429) {
+      const waitTime = 60 * 1000 // 60 segundos
+      console.log(`⏳ Rate limited, waiting ${waitTime/1000}s before retry ${i+1}/${maxRetries}`)
+      await new Promise(resolve => setTimeout(resolve, waitTime))
+      continue
+    }
+    
+    return response
+  }
+  throw new Error('Max retries exceeded for rate limiting')
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -317,8 +334,27 @@ export async function POST(req: NextRequest) {
             console.log(`✅ Template QR uploaded:`, templateQrPublicUrl)
             
             // Generate mockups for all selected package products
+            const MOCKUP_BLACKLIST = [92, 19] // Gorra y Taza - problemas con mockups automáticos
             const mockupPromises = packagesToProcess.map(async (pkg) => {
               return Promise.all(pkg.products.map(async (product) => {
+                // Skip productos sin ID válido
+                if (!product.productId || product.productId === 0) {
+                  console.log(`⏭️  Skipping product with invalid ID`)
+                  return null
+                }
+                
+                // Skip productos en blacklist
+                if (MOCKUP_BLACKLIST.includes(product.productId)) {
+                  console.log(`⏭️  Skipping blacklisted product ${product.productId}`)
+                  return null
+                }
+                
+                // Skip productos de bordado/embroidery
+                if (product.placement?.includes('embroidery')) {
+                  console.log(`⏭️  Skipping embroidery product ${product.productId}`)
+                  return null
+                }
+                
                 // Use default variant ID or fallback to product ID
                 const variantId = product.defaultVariantId && product.defaultVariantId !== 0 
                   ? product.defaultVariantId 
@@ -326,7 +362,7 @@ export async function POST(req: NextRequest) {
                 
                 console.log(`🎨 Generating mockup for product ${product.productId}, variant ${variantId}`)
                 
-                const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
+                const mockupResponse = await fetchWithRetry(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -356,7 +392,9 @@ export async function POST(req: NextRequest) {
                     for (let attempt = 0; attempt < 10; attempt++) {
                       await new Promise(resolve => setTimeout(resolve, 2000))
                       
-                      const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup/status?taskKey=${taskKey}`)
+                        const statusResponse = await fetchWithRetry(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup/status?taskKey=${taskKey}`, {
+                          method: 'GET'
+                        })
                       if (statusResponse.ok) {
                         const statusData = await statusResponse.json()
                         

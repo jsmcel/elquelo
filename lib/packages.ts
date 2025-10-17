@@ -69,7 +69,7 @@ export const PACKAGES: Record<string, PackageConfig> = {
     products: [
       { 
         productId: 19, 
-        defaultVariantId: 0, // Buscar 11oz variant
+        defaultVariantId: 1320, // 11oz White variant
         placement: 'default', 
         name: 'Taza 11oz',
         defaultSize: '11oz',
@@ -79,8 +79,8 @@ export const PACKAGES: Record<string, PackageConfig> = {
       },
       { 
         productId: 92, 
-        defaultVariantId: 0, // Buscar variant
-        placement: 'front', 
+        defaultVariantId: 0, // NO TIENE VARIANT ID válido - usar técnica embroidery
+        placement: 'embroidery_front', // NO 'front'
         name: 'Gorra 5 Panel',
         defaultSize: 'One size',
         defaultColor: 'Black',
@@ -112,7 +112,7 @@ export const PACKAGES: Record<string, PackageConfig> = {
     products: [
       { 
         productId: 19, 
-        defaultVariantId: 0, // Buscar 11oz variant
+        defaultVariantId: 1320, // 11oz White variant
         placement: 'default', 
         name: 'Taza 11oz',
         defaultSize: '11oz',
@@ -225,7 +225,7 @@ export const PACKAGES: Record<string, PackageConfig> = {
     products: [
       { 
         productId: 19, 
-        defaultVariantId: 0, // Buscar 11oz variant
+        defaultVariantId: 1320, // 11oz White variant
         placement: 'default', 
         name: 'Taza 11oz',
         defaultSize: '11oz',
