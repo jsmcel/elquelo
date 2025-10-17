@@ -203,12 +203,12 @@ export async function POST(req: NextRequest) {
         }
         
         // Create design entries for each QR and selected packages
-        const designData = data.map((qr: any) => {
+        const designData = data.map((qr: any, index: number) => {
           const allProducts: any[] = []
           const timestamp = new Date().toISOString()
           
-          // Get participant info to determine if they are novio/novia
-          const participant = members.find((m: any) => m.name === qr.title || m.name === qr.description)
+          // Get participant info by index (since QRs are created in same order as members)
+          const participant = members[index]
           const isNovioNovia = participant?.is_novio_novia || false
           
           // Add products from each selected package
@@ -220,7 +220,10 @@ export async function POST(req: NextRequest) {
             }
             
             pkg.products.forEach(product => {
-              const variantId = product.defaultVariantId || 0
+              // Use default variant ID or fallback to product ID if not specified
+              const variantId = product.defaultVariantId && product.defaultVariantId !== 0 
+                ? product.defaultVariantId 
+                : product.productId
               const realPrice = variantPrices[variantId] || product.estimatedPrice || 0
               
               allProducts.push({
@@ -316,15 +319,19 @@ export async function POST(req: NextRequest) {
             // Generate mockups for all selected package products
             const mockupPromises = packagesToProcess.map(async (pkg) => {
               return Promise.all(pkg.products.map(async (product) => {
-                if (product.defaultVariantId && product.defaultVariantId !== 0) {
-                  console.log(`🎨 Generating mockup for product ${product.productId}, variant ${product.defaultVariantId}`)
-                  
-                  const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      productId: product.productId,
-                      variantIds: [product.defaultVariantId],
+                // Use default variant ID or fallback to product ID
+                const variantId = product.defaultVariantId && product.defaultVariantId !== 0 
+                  ? product.defaultVariantId 
+                  : product.productId
+                
+                console.log(`🎨 Generating mockup for product ${product.productId}, variant ${variantId}`)
+                
+                const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    productId: product.productId,
+                    variantIds: [variantId],
                       files: [{
                         placement: product.placement || 'front',
                         imageUrl: templateQrPublicUrl,
@@ -359,7 +366,7 @@ export async function POST(req: NextRequest) {
                           // Store mockup URLs by variant ID
                           return {
                             productId: product.productId,
-                            variantId: product.defaultVariantId,
+                            variantId: variantId,
                             mockupUrls: statusData.result
                           }
                         } else if (statusData.status === 'failed') {
@@ -371,7 +378,6 @@ export async function POST(req: NextRequest) {
                   } else {
                     console.error(`❌ Failed to create mockup task for product ${product.productId}`)
                   }
-                }
                 return null
               }))
             })
