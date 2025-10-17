@@ -258,6 +258,9 @@ async function generateMockupsInBackground(data: any[], members: any[], selected
   try {
     console.log('🎨 Starting background mockup generation for', data.length, 'QRs')
     
+    // Create Supabase client for background processing
+    const supabase = createRouteHandlerClient({ cookies: () => new Map() })
+    
     // Get packages to process
     const packagesToProcess = getAllPackages().filter(pkg => selectedPackages.includes(pkg.id))
     
