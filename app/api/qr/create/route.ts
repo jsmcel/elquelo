@@ -272,20 +272,26 @@ async function generateMockupsInBackground(data: any[], members: any[], selected
     const packagesToProcess = getAllPackages().filter(pkg => selectedPackages.includes(pkg.id))
     
     // Generate individual mockups for each QR
+    console.log(`🎨 Starting to process ${data.length} QRs`)
     for (const qr of data) {
       try {
         console.log(`🎨 Processing QR: ${qr.code}`)
+        console.log(`🎨 QR title: ${qr.title}, description: ${qr.description}`)
         
         // Generate QR image for this specific QR
+        console.log(`🎨 Generating QR image for ${qr.code}`)
         const { generateStandardQR } = await import('@/lib/qr-generator')
         const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/qr/${qr.code}`
+        console.log(`🎨 QR URL: ${qrUrl}`)
         const qrDataUrl = await generateStandardQR(qrUrl)
+        console.log(`🎨 QR image generated successfully`)
         
         // Convert data URL to Buffer
         const base64Data = qrDataUrl.split(',')[1]
         const qrBuffer = Buffer.from(base64Data, 'base64')
         
         // Upload QR to Supabase Storage
+        console.log(`🎨 Uploading QR to storage for ${qr.code}`)
         const fileName = `${qr.code}-front-qr.png`
         const filePath = `designs/${fileName}`
         
