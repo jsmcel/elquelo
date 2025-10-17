@@ -131,7 +131,20 @@ export default function ConfiguratorPage() {
     setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
   }
 
-  const nextStep = () => setStep(prev => Math.min(prev + 1, 4))
+  const nextStep = () => {
+    // Validate current step before proceeding
+    if (step === 1) {
+      if (!groupName.trim()) {
+        toast.error('El nombre del grupo es obligatorio')
+        return
+      }
+      if (!eventDate) {
+        toast.error('La fecha del evento es obligatoria')
+        return
+      }
+    }
+    setStep(prev => Math.min(prev + 1, 4))
+  }
   const previousStep = () => setStep(prev => Math.max(prev - 1, 1))
 
   const handleSaveGroup = async () => {
@@ -282,7 +295,7 @@ export default function ConfiguratorPage() {
             <div className="flex justify-end">
                 <button
                 onClick={nextStep}
-                disabled={!groupName.trim()}
+                disabled={!groupName.trim() || !eventDate}
                 className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Siguiente <ArrowRight className="h-4 w-4" />
