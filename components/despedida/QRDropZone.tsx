@@ -96,3 +96,6 @@ export function QRDropZone({ qrId, qrCode, eventId, children, className = '' }: 
 
 
 
+
+
+

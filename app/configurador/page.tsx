@@ -45,7 +45,7 @@ export default function ConfiguratorPage() {
   const [groupName, setGroupName] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [selectedPackages, setSelectedPackages] = useState<string[]>(['camisetas']) // Por defecto camisetas marcado
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]) // Sin paquetes seleccionados por defecto
   const [generating, setGenerating] = useState(false)
   const [camisetaPrice, setCamisetaPrice] = useState<number>(0) // Se carga de la API
   const [packagePrices, setPackagePrices] = useState<Record<string, number>>({}) // Precios de todos los paquetes
@@ -264,20 +264,26 @@ export default function ConfiguratorPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Fecha del evento (opcional)</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Fecha del evento <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="date"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
+                  required
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                 />
+                {!eventDate && (
+                  <p className="text-xs text-red-500">La fecha del evento es obligatoria</p>
+                )}
               </div>
             </div>
 
             <div className="flex justify-end">
                 <button
                 onClick={nextStep}
-                disabled={!groupName.trim()}
+                disabled={!groupName.trim() || !eventDate}
                 className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Siguiente <ArrowRight className="h-4 w-4" />

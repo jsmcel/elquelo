@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
                 templateId: product.productId,
                 variantId: variantId,
                 productName: product.name,
-                size: product.defaultSize || 'M',
+                size: participant?.size || product.defaultSize || 'M',
                 color: product.defaultColor || 'White',
                 colorCode: product.defaultColorCode || '#FFFFFF',
                 unitPrice: realPrice,
@@ -313,71 +313,89 @@ export async function POST(req: NextRequest) {
             const templateQrPublicUrl = templateUrlData.publicUrl
             console.log(`✅ Template QR uploaded:`, templateQrPublicUrl)
             
-            // Request mockup with real QR
-            const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                productId: 71,
-                variantIds: [4013],
-                files: [{
-                  placement: 'front',
-                  imageUrl: templateQrPublicUrl,
-                  position: {
-                    top: 800,
-                    left: 800,
-                    width: 1800,
-                    height: 1800,
-                    areaWidth: 3600,
-                    areaHeight: 4800,
+            // Generate mockups for all selected package products
+            const mockupPromises = packagesToProcess.map(async (pkg) => {
+              return Promise.all(pkg.products.map(async (product) => {
+                if (product.defaultVariantId && product.defaultVariantId !== 0) {
+                  console.log(`🎨 Generating mockup for product ${product.productId}, variant ${product.defaultVariantId}`)
+                  
+                  const mockupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      productId: product.productId,
+                      variantIds: [product.defaultVariantId],
+                      files: [{
+                        placement: product.placement || 'front',
+                        imageUrl: templateQrPublicUrl,
+                        position: {
+                          top: 800,
+                          left: 800,
+                          width: 1800,
+                          height: 1800,
+                          areaWidth: 3600,
+                          areaHeight: 4800,
+                        }
+                      }]
+                    })
+                  })
+
+                  if (mockupResponse.ok) {
+                    const mockupData = await mockupResponse.json()
+                    const taskKey = mockupData.requestId
+                    console.log(`✅ Mockup task created for product ${product.productId}:`, taskKey)
+                    
+                    // Poll for mockup completion (max 10 attempts, 2 seconds each)
+                    for (let attempt = 0; attempt < 10; attempt++) {
+                      await new Promise(resolve => setTimeout(resolve, 2000))
+                      
+                      const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup/status?taskKey=${taskKey}`)
+                      if (statusResponse.ok) {
+                        const statusData = await statusResponse.json()
+                        
+                        if (statusData.status === 'completed' && statusData.result) {
+                          console.log(`✅ Mockup completed for product ${product.productId}`)
+                          
+                          // Store mockup URLs by variant ID
+                          return {
+                            productId: product.productId,
+                            variantId: product.defaultVariantId,
+                            mockupUrls: statusData.result
+                          }
+                        } else if (statusData.status === 'failed') {
+                          console.error(`❌ Mockup failed for product ${product.productId}:`, statusData.error)
+                          break
+                        }
+                      }
+                    }
+                  } else {
+                    console.error(`❌ Failed to create mockup task for product ${product.productId}`)
                   }
-                }]
-              })
+                }
+                return null
+              }))
             })
 
-            if (mockupResponse.ok) {
-              const mockupData = await mockupResponse.json()
-              const taskKey = mockupData.requestId
-              console.log(`✅ Generic mockup task created:`, taskKey)
-              
-              // Poll for mockup completion (max 10 attempts, 2 seconds each)
-              for (let attempt = 0; attempt < 10; attempt++) {
-                await new Promise(resolve => setTimeout(resolve, 2000))
-                
-                const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/printful/mockup?requestId=${taskKey}`)
-                if (!statusResponse.ok) continue
-                
-                const statusData = await statusResponse.json()
-                
-                if (statusData.status === 'completed' && statusData.normalizedMockups) {
-                  // Convert array format to object format expected by extractPrintfulSummary
-                  const normalizedArray = statusData.normalizedMockups
-                  genericMockupUrls = {}
-                  
-                  normalizedArray.forEach((mockup: any) => {
-                    const variantId = mockup.variantId
-                    const placement = mockup.placement
-                    const url = mockup.url
-                    
-                    if (!genericMockupUrls[variantId]) {
-                      genericMockupUrls[variantId] = {}
-                    }
-                    // Store as object with url property to match frontend expectations
-                    genericMockupUrls[variantId][placement] = { url: url }
-                  })
-                  
-                  console.log(`✅ Generic mockup completed:`, genericMockupUrls)
-                  break
-                }
-                
-                if (statusData.status === 'failed') {
-                  console.error(`❌ Generic mockup generation failed`)
-                  break
-                }
+            // Wait for all mockup generation to complete
+            const allMockupResults = await Promise.all(mockupPromises)
+            const flatMockupResults = allMockupResults.flat().filter(result => result !== null)
+            
+            // Build generic mockup URLs from all successful mockups
+            flatMockupResults.forEach(result => {
+              if (result) {
+                Object.entries(result.mockupUrls).forEach(([placement, mockupData]: [string, any]) => {
+                  if (!genericMockupUrls[result.variantId]) {
+                    genericMockupUrls[result.variantId] = {}
+                  }
+                  genericMockupUrls[result.variantId][placement] = {
+                    url: mockupData.url,
+                    raw: mockupData
+                  }
+                })
               }
-            } else {
-              console.error(`❌ Failed to request generic mockup`)
-            }
+            })
+            
+            console.log(`✅ Generated mockups for ${flatMockupResults.length} products`)
           } catch (error) {
             console.error(`❌ Error generating generic mockup:`, error)
           }
@@ -442,7 +460,12 @@ export async function POST(req: NextRequest) {
 
               let productUpdated = false
               const updatedProducts = existingProducts.map((product: any) => {
-                const shouldAttachQr = product?.productId === 71 || product?.variantId === 4013
+                // Add QR to all products that have front placement capability
+                // This includes t-shirts (71), hoodies (145), and other clothing items
+                const shouldAttachQr = product?.productId === 71 || // T-shirts
+                                       product?.productId === 145 || // Hoodies
+                                       product?.variantId === 4013 || // T-shirt variant
+                                       product?.variantId === 18759 // Hoodie variant
 
                 if (!shouldAttachQr) {
                   return product
