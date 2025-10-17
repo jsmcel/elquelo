@@ -45,7 +45,7 @@ export default function ConfiguratorPage() {
   const [groupName, setGroupName] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [selectedPackages, setSelectedPackages] = useState<string[]>(['camisetas']) // Por defecto camisetas marcado
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([]) // Sin paquetes por defecto
   const [generating, setGenerating] = useState(false)
   const [camisetaPrice, setCamisetaPrice] = useState<number>(0) // Se carga de la API
   const [packagePrices, setPackagePrices] = useState<Record<string, number>>({}) // Precios de todos los paquetes
@@ -145,6 +145,11 @@ export default function ConfiguratorPage() {
       return
     }
 
+    if (!eventDate) {
+      toast.error('La fecha del evento es obligatoria')
+      return
+    }
+
     setGenerating(true)
 
     try {
@@ -154,7 +159,7 @@ export default function ConfiguratorPage() {
         destination_url: FALLBACK_QR_URL,
         description: normalizedGroupName ? `Kit ${normalizedGroupName}` : 'Kit personalizado',
         group: normalizedGroupName || undefined,
-        eventDate: eventDate || undefined, // Enviar fecha del evento
+        eventDate: eventDate, // Fecha del evento (obligatoria)
         selectedPackages: selectedPackages, // Enviar paquetes seleccionados
         members: participants.map((participant) => ({
           name: participant.name,
@@ -264,7 +269,7 @@ export default function ConfiguratorPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Fecha del evento (opcional)</label>
+                <label className="text-sm font-medium text-gray-700">Fecha del evento *</label>
                 <input
                   type="date"
                   value={eventDate}

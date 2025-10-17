@@ -75,6 +75,11 @@ export default function ConfiguratorPage() {
       return
     }
 
+    if (!eventDate) {
+      toast.error('La fecha del evento es obligatoria')
+      return
+    }
+
     setGenerating(true)
 
     try {
@@ -84,10 +89,14 @@ export default function ConfiguratorPage() {
         destination_url: FALLBACK_QR_URL,
         description: normalizedGroupName ? `Kit ${normalizedGroupName}` : 'Kit personalizado',
         group: normalizedGroupName || undefined,
+        eventDate: eventDate, // Fecha del evento (obligatoria)
         members: participants.map((participant) => ({
           name: participant.name,
           title: normalizedGroupName ? `${normalizedGroupName} - ${participant.name}` : participant.name,
           destination_url: FALLBACK_QR_URL,
+          email: participant.email,
+          size: participant.size,
+          is_novio_novia: false, // configurador-simple no tiene esta opción
         })),
       }
 
@@ -189,7 +198,7 @@ export default function ConfiguratorPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Fecha del evento (opcional)</label>
+                <label className="text-sm font-medium text-gray-700">Fecha del evento *</label>
                 <input
                   type="date"
                   value={eventDate}
