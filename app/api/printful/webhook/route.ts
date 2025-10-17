@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const webhookData = await req.json()
     const { type, data } = webhookData
 
@@ -15,19 +14,19 @@ export async function POST(req: NextRequest) {
 
     switch (type) {
       case 'order_updated':
-        await handleOrderUpdated(data)
+        await handleOrderUpdated(supabase, data)
         break
       case 'order_failed':
-        await handleOrderFailed(data)
+        await handleOrderFailed(supabase, data)
         break
       case 'order_canceled':
-        await handleOrderCanceled(data)
+        await handleOrderCanceled(supabase, data)
         break
       case 'package_shipped':
-        await handlePackageShipped(data)
+        await handlePackageShipped(supabase, data)
         break
       case 'package_returned':
-        await handlePackageReturned(data)
+        await handlePackageReturned(supabase, data)
         break
       default:
         console.log(`Unhandled webhook type: ${type}`)
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleOrderUpdated(data: any) {
+async function handleOrderUpdated(supabase: any, data: any) {
   const { external_id, status } = data
   
   await supabase
@@ -49,7 +48,7 @@ async function handleOrderUpdated(data: any) {
     .eq('id', external_id)
 }
 
-async function handleOrderFailed(data: any) {
+async function handleOrderFailed(supabase: any, data: any) {
   const { external_id, reason } = data
   
   await supabase
@@ -61,7 +60,7 @@ async function handleOrderFailed(data: any) {
     .eq('id', external_id)
 }
 
-async function handleOrderCanceled(data: any) {
+async function handleOrderCanceled(supabase: any, data: any) {
   const { external_id } = data
   
   await supabase
@@ -70,7 +69,7 @@ async function handleOrderCanceled(data: any) {
     .eq('id', external_id)
 }
 
-async function handlePackageShipped(data: any) {
+async function handlePackageShipped(supabase: any, data: any) {
   const { external_id, tracking_number, tracking_url } = data
   
   await supabase
@@ -83,7 +82,7 @@ async function handlePackageShipped(data: any) {
     .eq('id', external_id)
 }
 
-async function handlePackageReturned(data: any) {
+async function handlePackageReturned(supabase: any, data: any) {
   const { external_id, reason } = data
   
   await supabase

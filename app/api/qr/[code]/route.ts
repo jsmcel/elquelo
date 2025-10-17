@@ -3,17 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 // GET - Redirect to QR destination
 export async function GET(
   req: NextRequest,
   { params }: { params: { code: string } }
 ) {
   try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const { code } = params
 
     const { data: qr, error } = await supabase
@@ -27,7 +26,7 @@ export async function GET(
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/404`)
     }
 
-    await logScan(qr.id, req)
+    await logScan(supabase, qr.id, req)
 
     await supabase
       .from('qrs')
@@ -47,6 +46,10 @@ export async function POST(
   { params }: { params: { code: string } }
 ) {
   try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const { code } = params
     const { destination_url, title, description, is_active } = await req.json()
 
@@ -127,6 +130,10 @@ export async function DELETE(
   { params }: { params: { code: string } }
 ) {
   try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const { code } = params
 
     const supabaseAuth = createRouteHandlerClient({ cookies })
@@ -178,7 +185,7 @@ export async function DELETE(
   }
 }
 
-async function logScan(qrId: string, req: NextRequest) {
+async function logScan(supabase: any, qrId: string, req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
     const userAgent = req.headers.get('user-agent') || 'unknown'

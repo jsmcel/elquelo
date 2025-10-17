@@ -3,11 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg'] as const
 
 function resolveExtension(mimeType: string) {
@@ -18,6 +13,10 @@ function resolveExtension(mimeType: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const supabaseAuth = createRouteHandlerClient({ cookies })
     const {
       data: { user },

@@ -13,13 +13,14 @@ type MemberPayload = {
   is_novio_novia?: boolean
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Crear el cliente dentro del handler para evitar ejecución en build
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const cookieStore = cookies()
     const supabaseClient = createRouteHandlerClient({ cookies: () => cookieStore })
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
